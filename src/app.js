@@ -72,10 +72,15 @@ function loadStore() {
 function writeStore() {
   clearTimeout(saveT);
   saveT = setTimeout(() => {
+    saveT = null;
     try { DB.savedAt = new Date().toISOString(); localStorage.setItem(STORE_KEY, JSON.stringify(DB)); S.storeOk = true; setSave('saved'); }
     catch (e) { S.storeOk = false; setSave('error', 'This browser won’t let the page save. Download a backup so you don’t lose your work.'); }
   }, 250);
 }
+// write any pending save right away if the page is closed, reloaded or backgrounded
+function flushStore() { if (!saveT) return; clearTimeout(saveT); saveT = null; try { DB.savedAt = new Date().toISOString(); localStorage.setItem(STORE_KEY, JSON.stringify(DB)); } catch (e) {} }
+addEventListener('pagehide', flushStore);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushStore(); });
 function persist() {
   if (S.team) { DB.teams[S.team.id] = S.team; DB.lineups[S.team.id] = S.lineups; S.team.updatedAt = new Date().toISOString(); }
   DB.cur = S.team ? S.team.id : null;
@@ -717,7 +722,7 @@ function header() {
     <button class="btn primary" data-act="new">+ New lineup</button>
     ${L ? `<button class="btn" data-act="edit">Edit setup</button>` : ''}
     ${L && S.confirmDel ? `<span class="confirm">Delete “${esc(L.name)}”? <button class="btn danger" data-act="del-yes">Delete</button><button class="btn ghost" data-act="del-no">Keep</button></span>`
-      : `<details class="more"><summary class="btn">More</summary><div class="menu">${L ? `<button data-act="dup">Duplicate lineup</button>` : ''}<button data-act="backup">Backup &amp; restore</button>${L ? `<button class="danger" data-act="del">Delete lineup</button>` : ''}</div></details>`}
+      : `<details class="more"><summary class="btn">More</summary><div class="menu">${L ? `<button data-act="dup">Duplicate lineup</button>` : ''}<button data-act="team-edit" data-id="${esc(S.team.id)}">Edit team name</button><button data-act="backup">Backup &amp; restore</button>${L ? `<button class="danger" data-act="del">Delete lineup</button>` : ''}</div></details>`}
   </div></div>`;
 }
 const dlIcon = () => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m0 0l-3-3m3 3l3-3M3 12.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -1777,10 +1782,10 @@ function render() {
   const body = { board: boardView, rot: rotView, serve: serveView, live: liveView, roster: rosterView, calls: callsView }[S.view]();
   app.innerHTML = header() + sandboxBar() + tabs() + body;
   const oldSheet = document.querySelector('#overlay .sheet'), sheetY = oldSheet ? oldSheet.scrollTop : 0, sameSheet = oldSheet && !!S.ed === !!oldSheet.querySelector('[aria-label^="Rotation"]');
-  $('#overlay').innerHTML = editor() + dlgView() + fbView() + backupView();
+  $('#overlay').innerHTML = editor() + dlgView() + fbView() + backupView() + teamDlgView();
   const newSheet = document.querySelector('#overlay .sheet');
   if (newSheet && sameSheet && (S.ed ? S.ed.keepScroll !== false : !!S.dlg)) newSheet.scrollTop = sheetY;
-  document.body.style.overflow = S.ed || S.dlg || S.fb || S.bk ? 'hidden' : '';
+  document.body.style.overflow = S.ed || S.dlg || S.fb || S.bk || S.tdlg ? 'hidden' : '';
   window.scrollTo(0, scrollY);
   animateFix();
   startAnim();
@@ -2294,7 +2299,7 @@ function homeView() {
     const lu = (DB.lineups[t.id] || []).length, PL = t.roster || t.players, need = PL.filter(p => !p.roles.length).length;
     return `<div class="tcard" data-team="${esc(t.id)}" role="button" tabindex="0"><div class="tc-top"><b>${esc(t.name)}</b>${t.source === 'sample' ? '<span class="pill sunp">Sample</span>' : ''}</div>
       <span class="small">${(t.roster || t.players).length} players · ${lu} lineup${lu === 1 ? '' : 's'}${need ? ` · ${need} need positions` : ''}</span>
-      <div class="tc-act">${S.confirmTeamDel === t.id ? `<span class="confirm">Delete this team and its lineups? <button class="btn danger" data-act="team-del-yes" data-id="${esc(t.id)}">Delete</button><button class="btn ghost" data-act="team-del-no">Keep</button></span>` : `<button class="btn primary" data-team="${esc(t.id)}">Open</button><button class="btn ghost danger" data-act="team-del" data-id="${esc(t.id)}">Delete</button>`}</div></div>`;
+      <div class="tc-act">${S.confirmTeamDel === t.id ? `<span class="confirm">Delete this team and its lineups? <button class="btn danger" data-act="team-del-yes" data-id="${esc(t.id)}">Delete</button><button class="btn ghost" data-act="team-del-no">Keep</button></span>` : `<button class="btn primary" data-team="${esc(t.id)}">Open</button><button class="btn ghost" data-act="team-edit" data-id="${esc(t.id)}">Rename</button><button class="btn ghost danger" data-act="team-del" data-id="${esc(t.id)}">Delete</button>`}</div></div>`;
   }).join('');
   return `<div class="top home"><div>
     <div class="brand"><svg class="sunball" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="12" fill="var(--sun)"/><path d="M1.5 11.5c6 1.5 17 1.5 23 0M4 20c4-4 14-4 18 0M13 1c-4 6-4 18 0 24" stroke="var(--sun-ink)" stroke-width="1.4" fill="none" opacity=".55"/></svg><span class="eyebrow">Volleyball lineups</span></div>
@@ -2312,9 +2317,16 @@ function homeView() {
 /* ---------- add-team dialog ---------- */
 function teamDlgView() {
   const D = S.tdlg; if (!D) return '';
+  const fields = `<div class="sec"><div class="row2"><label class="lbl2">Team name<input type="text" id="tName" value="${esc(D.name)}" placeholder="e.g. 14 Black"></label><label class="lbl2">Season<input type="text" id="tSeason" value="${esc(D.season)}" placeholder="2026-27"></label></div></div>`;
+  if (D.editId) return `<div class="sheet" data-act="tdlg-bg"><div class="panel" role="dialog" aria-modal="true" aria-label="Edit team" style="max-width:560px">
+    <div class="phead"><h2>Edit team</h2><span class="grow"></span><button class="btn" data-act="tdlg-close">Cancel</button></div>
+    ${fields}
+    ${D.err ? `<p class="err-text">${esc(D.err)}</p>` : ''}
+    <div class="btnrow" style="margin-top:14px;justify-content:flex-end"><button class="btn primary" data-act="tdlg-save">Save</button></div>
+  </div></div>`;
   return `<div class="sheet" data-act="tdlg-bg"><div class="panel" role="dialog" aria-modal="true" aria-label="Add your team" style="max-width:860px">
     <div class="phead"><h2>Add your team</h2><span class="grow"></span><button class="btn" data-act="tdlg-close">Cancel</button></div>
-    <div class="sec"><div class="row2"><label class="lbl2">Team name<input type="text" id="tName" value="${esc(D.name)}" placeholder="e.g. 14 Black"></label><label class="lbl2">Season<input type="text" id="tSeason" value="${esc(D.season)}" placeholder="2026-27"></label></div></div>
+    ${fields}
     <div class="sec"><h3>Roster</h3><p class="small" style="margin:-4px 0 8px">Paste from a spreadsheet or type one player per line: jersey, name, positions (S, OH, M, OPP, L, DS), then <b>lefty</b>, <b>back row</b> or <b>passer</b> if they apply. You can fix anything later on the Roster tab.</p>
       <textarea id="tRoster" rows="8" placeholder="${esc(PASTE_EXAMPLE)}">${esc(D.text)}</textarea>
       <div id="tPreview">${rosterPreview(D.text)}</div></div>
@@ -2384,6 +2396,13 @@ function homeClick(t, e) {
   if (t.dataset.team && !a) { openTeam(t.dataset.team); render(); window.scrollTo(0, 0); return true; }
   if (a === 'home') { S.home = true; S.ed = null; S.dlg = null; S.team = null; S.lineups = []; S.cur = null; DB.cur = null; writeStore(); render(); window.scrollTo(0, 0); return true; }
   if (a === 'team-new') { S.tdlg = { name: '', season: SEASON_DEFAULT, text: '', err: '' }; render(); setTimeout(() => { const el = document.getElementById('tName'); if (el) el.focus(); }, 30); return true; }
+  if (a === 'team-edit') { const tm = DB.teams[t.dataset.id]; if (!tm) return true; t.closest('details')?.removeAttribute('open'); S.tdlg = { editId: tm.id, name: tm.name, season: tm.season || '', err: '' }; render(); setTimeout(() => { const el = document.getElementById('tName'); if (el) { el.focus(); el.select(); } }, 30); return true; }
+  if (a === 'tdlg-save') {
+    readTdlg(); const D = S.tdlg, tm = DB.teams[D.editId];
+    if (!D.name.trim()) { D.err = 'Give the team a name.'; render(); return true; }
+    if (tm) { tm.name = D.name.trim(); tm.season = D.season.trim(); tm.updatedAt = new Date().toISOString(); writeStore(); }
+    S.tdlg = null; toast('Team updated'); render(); return true;
+  }
   if (a === 'tdlg-close') { S.tdlg = null; render(); return true; }
   if (a === 'tdlg-bg') { if (e.target === t) { readTdlg(); S.tdlg = null; render(); } return true; }
   if (a === 'tdlg-create') {
@@ -2425,6 +2444,7 @@ document.addEventListener('change', e => {
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && (S.tdlg || S.bk)) { S.tdlg = null; S.bk = null; render(); }
+  if (e.key === 'Enter' && S.tdlg && S.tdlg.editId && (e.target.id === 'tName' || e.target.id === 'tSeason')) { e.preventDefault(); document.querySelector('[data-act="tdlg-save"]')?.click(); }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.tcard')) { e.preventDefault(); openTeam(e.target.dataset.team); render(); }
 });
 
