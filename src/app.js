@@ -939,7 +939,8 @@ function liveOverrides(L, st) {
 
 /* starting six (before the set) */
 function setupFor(L) {
-  const prev = S.live && S.live.lu === L.id ? S.live : S.lastSet && S.lastSet.lu === L.id ? S.lastSet : null;
+  // last set's setup: the one in progress or just ended, else the last one started with this lineup (saved on the lineup)
+  const prev = S.live && S.live.lu === L.id ? S.live : S.lastSet && S.lastSet.lu === L.id ? S.lastSet : L.liveStart || null;
   const ok = prev && prev.start && prev.start.length === 6 && prev.start.every(id => pool().some(p => p.id === id));
   return { lu: L.id, r: prev ? prev.startR || 1 : 1, slots: ok ? prev.start.slice() : L.order.map(tokP), lib: prev && ok ? prev.lib : tokP((L.liberos || [])[0] || null), them: prev && prev.names ? prev.names.them : 'Them', plans: prev && prev.plans ? clone(prev.plans) : [], sel: null };
 }
@@ -951,6 +952,8 @@ function liveNew(serving) {
   syncLab(L, st);
   st.log.unshift(`Start: ${serving === 'us' ? 'we serve' : 'we receive'} in rotation ${U.r}`);
   S.live = st; S.liveSetup = null; liveSave();
+  L.liveStart = { start: st.start.slice(), startR: st.startR, lib: st.lib, plans: clone(st.plans), names: { them: st.names.them } };   // remembered for the next set
+  saveLineup(L);
 }
 function afterRotate(L, st, why) {
   syncLab(L, st);
