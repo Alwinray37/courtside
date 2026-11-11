@@ -152,6 +152,25 @@ function lineGeo(from, ln) {
   const M = [.25 * F[0] + .5 * C[0] + .25 * T[0], .25 * F[1] + .5 * C[1] + .25 * T[1]];
   return { d: `M${S0[0].toFixed(1)},${S0[1].toFixed(1)} Q${C[0].toFixed(1)},${C[1].toFixed(1)} ${T[0].toFixed(1)},${T[1].toFixed(1)}`, T, M, short: Math.hypot(T[0] - S0[0], T[1] - S0[1]) < 6 };
 }
+/* ---------- Board undo: per lineup + rotation, in memory for this session ---------- */
+const BD_HIST_MAX = 100;
+S.bdHist = {};
+const bdHist = (lid, r) => S.bdHist[lid + ':' + r] || (S.bdHist[lid + ':' + r] = []);
+const rotSnap = rot => ({ spots: clone(rot.spots || {}), lines: rot.lines ? clone(rot.lines) : null });
+function bdPush(L, r, snap) { const h = bdHist(L.id, r); h.push(snap || rotSnap(rotOf(L, r))); if (h.length > BD_HIST_MAX) h.shift(); }
+const undoBtn = n => `<button class="btn ghost" data-act="bd-undo" ${n ? '' : 'disabled'} title="Undo (Ctrl/Cmd+Z)">↶ Undo</button>`;
+function bdUndo() {
+  const L = curL(); if (!L || S.view !== 'board' || !S.bd || S.bd.base) return;
+  const prev = boardSnap();
+  if (S.bd.def) { const h = S.bd.defHist || []; if (!h.length) return; S.bd.defOv = h.pop(); }
+  else {
+    const h = bdHist(L.id, S.bd.r); if (!h.length) return;
+    const snap = h.pop(), rot = rotOf(L, S.bd.r);
+    rot.spots = snap.spots; if (snap.lines) rot.lines = snap.lines; else delete rot.lines;
+    saveLineup(L);
+  }
+  S.bd.srConfirm = null; S.bd.anim = 'rot'; S.bd.prev = prev; render();
+}
 function toggleLine(L, r, id) {
   const lines = linesMat(L, r), sp = rotOf(L, r).spots[id], z = ENG.court(L, r).zoneOf[id];
   if (lines[id]) delete lines[id];
@@ -826,8 +845,7 @@ function boardView() {
     ${st && !S.bd.def ? `<ul class="issues bd-iss">${iss.map(i => `<li class="${i.level}"><span class="ic">${i.level === 'error' ? '!' : '?'}</span><span>${esc(i.msg)}</span></li>`).join('')}</ul>` : ''}
     <div class="viewtog bd-mode" role="tablist" aria-label="Show"><button data-act="bd-mode" data-m="base" aria-selected="${!!S.bd.base}">Rotation base</button><button data-act="bd-mode" data-m="sr" aria-selected="${!S.bd.base && !S.bd.def}">Serve receive</button><button data-act="bd-mode" data-m="def" aria-selected="${!!S.bd.def}">Defense</button></div>
     <div class="bigcourt bd-court${S.bd.base ? ' base' : ''}${S.bd.def ? ' def' : ''}">${courtSVG(L, r, { big: true, drag: S.canWrite && !S.bd.base && !S.bd.def && !preview, board: true, issues: iss })}</div>
-    <p class="hint">${S.bd.def ? 'Base defense after the serve: front row at the net, zones 5 and 1 up at the 10-foot line, zone 6 deep. Drag players to try other spots; moves aren’t saved.' : preview ? 'Preview only. Save it to use this libero setup on the Rotations cards and in the live set; dragging is off until then.' : S.bd.base ? 'Where each player stands in the rotation order before the serve. Switch back to Serve receive to see them move to their spots.' : 'Drag players to move them. Tap a player to add or remove her attack line, then drag the line’s end or its middle dot to shape it.'}</p>
-    ${S.bd.def ? `<div class="btnrow" style="justify-content:center;margin-top:6px">${S.bd.defOv && Object.keys(S.bd.defOv).length ? '<button class="btn ghost" data-act="bd-def-reset">Reset defense</button>' : ''}</div>` : `<div class="btnrow" style="justify-content:center;margin-top:6px">${!S.bd.base && !preview && S.canWrite ? (S.bd.srConfirm === r ? `<span class="confirm">Reset rotation ${r} to the default formation? <button class="btn danger" data-act="bd-sr-reset-yes">Reset</button><button class="btn ghost" data-act="bd-sr-reset-no">Keep</button></span>` : `<button class="btn ghost" data-act="bd-sr-reset">Reset positions</button>`) : ''}${rot.lines ? `<button class="btn ghost" data-act="bd-reset">Reset lines to set calls</button>` : ''}<button class="btn ghost" data-act="bd-clear">Clear lines</button></div>`}
+    ${S.bd.def ? `<div class="btnrow" style="justify-content:center;margin-top:6px">${undoBtn((S.bd.defHist || []).length)}${S.bd.defOv && Object.keys(S.bd.defOv).length ? '<button class="btn ghost" data-act="bd-def-reset">Reset defense</button>' : ''}</div>` : `<div class="btnrow" style="justify-content:center;margin-top:6px">${!S.bd.base && !preview && S.canWrite ? undoBtn(bdHist(L.id, r).length) : ''}${!S.bd.base && !preview && S.canWrite ? (S.bd.srConfirm === r ? `<span class="confirm">Reset rotation ${r} to the default formation? <button class="btn danger" data-act="bd-sr-reset-yes">Reset</button><button class="btn ghost" data-act="bd-sr-reset-no">Keep</button></span>` : `<button class="btn ghost" data-act="bd-sr-reset">Reset positions</button>`) : ''}${rot.lines ? `<button class="btn ghost" data-act="bd-reset">Reset lines to set calls</button>` : ''}<button class="btn ghost" data-act="bd-clear">Clear lines</button></div>`}
     <div class="libmode" role="radiogroup" aria-label="Libero">${[['none', 'No libero'], ['mb', 'Libero for MB'], ['oh', 'Libero for OH']].map(([v, t]) => `<label class="tog"><input type="radio" name="bdlib" value="${v}" ${S.bd.lib === v ? 'checked' : ''}> ${t}${v === saved ? ' <span class="small">(saved)</span>' : ''}</label>`).join('')}
       ${preview ? `<button class="btn primary" data-act="bd-lib-save">Save to rotations &amp; live set</button>` : ''}</div>
     <div class="legend">${legend()}</div>
@@ -1601,7 +1619,7 @@ function buildFromDlg() {
     applySampleTemplate(L, r, R);
   }
   if (D.mode === 'edit') S.lineups = S.lineups.map(x => x.id === L.id ? L : x); else S.lineups.push(L);
-  S.cur = L.id; S.dlg = null; S.view = 'board'; S.bd = { r: 1 }; saveLineup(L); toast(D.mode === 'edit' ? 'Lineup rebuilt' : 'Lineup built');
+  S.cur = L.id; S.dlg = null; S.view = 'board'; S.bd = { r: 1 }; S.bdHist = {}; saveLineup(L); toast(D.mode === 'edit' ? 'Lineup rebuilt' : 'Lineup built');
 }
 
 /* ---------- subs made right in a rotation (DS for passing, a new hitter for the front row) ---------- */
@@ -1825,6 +1843,7 @@ document.addEventListener('pointerdown', e => {
 document.addEventListener('pointermove', e => {
   const d = ddrag; if (!d) return;
   if (!d.moved && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 5) return;
+  if (!d.moved) (S.bd.defHist = S.bd.defHist || []).push(clone(S.bd.defOv || {}));
   d.moved = true;
   const [px, py] = svgXY(d.svg, e), x = Math.min(.98, Math.max(.02, px)), y = Math.min(.99, Math.max(.02, py));
   S.bd.defOv = S.bd.defOv || {}; S.bd.defOv[d.id] = [x, y];
@@ -1833,7 +1852,7 @@ document.addEventListener('pointermove', e => {
 document.addEventListener('pointerup', () => {
   const d = ddrag; if (!d) return; ddrag = null;
   d.g.classList.remove('dragging');
-  if (d.moved && !document.querySelector('[data-act="bd-def-reset"]')) render();     // show the Reset button
+  if (d.moved) render();     // show Undo / Reset
 });
 function boardSnap() {   // where every token is right now, before the board re-renders
   const out = {}; document.querySelectorAll('.bd-court svg .tok[data-id]').forEach(g => { out[g.dataset.id] = g.style.transform || srT(g); }); return out;
@@ -1873,19 +1892,20 @@ document.addEventListener('click', e => {
   if (t.dataset.sx) { const n = setTarget(+t.dataset.sx); const b1 = G('Back 1'); toast(`Setter target: ${sxLabel(SXT())}.${n ? ` ${n} sets that key off the setter moved with her${b1 && b1.rel ? ` (Back 1 is now ${(b1.x * 9).toFixed(1)} m from the left)` : ''}.` : ''}`); render(); return; }
   if (t.dataset.lu) { S.cur = t.dataset.lu; S.confirmDel = false; S.review = null; S.fixLog = null; render(); return; }
   if (t.dataset.view) { S.view = t.dataset.view; render(); return; }
-  if (t.dataset.act === 'bd-go') { const r = +t.dataset.r, prev = boardSnap(); S.bd = { ...(S.bd || {}), r, anim: S.bd && S.bd.r !== r ? 'rot' : null, prev, srConfirm: null, defOv: S.bd && S.bd.r !== r ? {} : S.bd && S.bd.defOv }; render(); return; }
-  if (t.dataset.act === 'bd-lib-save' && L) { const N = withLibMode(L, S.bd.lib); L.rotations = N.rotations; L.liberos = N.liberos; saveLineup(L); toast(S.bd.lib === 'none' ? 'Saved: no libero' : `Saved: libero for ${S.bd.lib === 'oh' ? 'OH' : 'MB'} in every rotation`); render(); return; }
-  if (t.dataset.act === 'bd-mode') { const m = t.dataset.m, cur = bdMode(); if (m !== cur) { S.bd.base = m === 'base'; S.bd.def = m === 'def'; S.bd.defOv = {}; S.bd.srConfirm = null; S.bd.anim = 'from:' + cur; } render(); return; }
+  if (t.dataset.act === 'bd-go') { const r = +t.dataset.r, prev = boardSnap(); S.bd = { ...(S.bd || {}), r, anim: S.bd && S.bd.r !== r ? 'rot' : null, prev, srConfirm: null, defOv: S.bd && S.bd.r !== r ? {} : S.bd && S.bd.defOv, defHist: S.bd && S.bd.r !== r ? [] : S.bd && S.bd.defHist }; render(); return; }
+  if (t.dataset.act === 'bd-lib-save' && L) { S.bdHist = {}; const N = withLibMode(L, S.bd.lib); L.rotations = N.rotations; L.liberos = N.liberos; saveLineup(L); toast(S.bd.lib === 'none' ? 'Saved: no libero' : `Saved: libero for ${S.bd.lib === 'oh' ? 'OH' : 'MB'} in every rotation`); render(); return; }
+  if (t.dataset.act === 'bd-mode') { const m = t.dataset.m, cur = bdMode(); if (m !== cur) { S.bd.base = m === 'base'; S.bd.def = m === 'def'; S.bd.defOv = {}; S.bd.defHist = []; S.bd.srConfirm = null; S.bd.anim = 'from:' + cur; } render(); return; }
   if (t.dataset.act === 'bd-sr-reset') { S.bd.srConfirm = S.bd.r; render(); return; }
   if (t.dataset.act === 'bd-sr-reset-no') { S.bd.srConfirm = null; render(); return; }
   if (t.dataset.act === 'bd-sr-reset-yes' && L) {      // rebuild this rotation's serve-receive spots from its set calls and passers
     const r = S.bd.r, rot = rotOf(L, r), prev = boardSnap();
-    rot.spots = defaultSpots(L, r, rot);
+    bdPush(L, r); rot.spots = defaultSpots(L, r, rot);
     S.bd.srConfirm = null; S.bd.anim = 'rot'; S.bd.prev = prev; saveLineup(L); toast(`Rotation ${r} reset`); render(); return;
   }
-  if (t.dataset.act === 'bd-def-reset') { const prev = boardSnap(); S.bd.defOv = {}; S.bd.anim = 'rot'; S.bd.prev = prev; render(); return; }
-  if (t.dataset.act === 'bd-reset' && L) { delete rotOf(L, S.bd.r).lines; saveLineup(L); render(); return; }
-  if (t.dataset.act === 'bd-clear' && L) { rotOf(L, S.bd.r).lines = {}; saveLineup(L); render(); return; }
+  if (t.dataset.act === 'bd-def-reset') { const prev = boardSnap(); (S.bd.defHist = S.bd.defHist || []).push(clone(S.bd.defOv || {})); S.bd.defOv = {}; S.bd.anim = 'rot'; S.bd.prev = prev; render(); return; }
+  if (t.dataset.act === 'bd-undo') { bdUndo(); return; }
+  if (t.dataset.act === 'bd-reset' && L) { bdPush(L, S.bd.r); delete rotOf(L, S.bd.r).lines; saveLineup(L); render(); return; }
+  if (t.dataset.act === 'bd-clear' && L) { bdPush(L, S.bd.r); rotOf(L, S.bd.r).lines = {}; saveLineup(L); render(); return; }
   if (t.dataset.open) { S.ed = { r: +t.dataset.open, view: 'anim' }; S.sug = null; Object.assign(anims.top, { t: 0, feature: 0, playing: false, fresh: true, featId: null, cycle: true }); Object.assign(anims.opt, { t: 0, feature: 0, playing: true }); render(); return; }
   if (t.dataset.go) { S.ed = { r: +t.dataset.go, view: S.ed.view }; S.sug = null; Object.assign(anims.top, { t: 0, feature: 0, playing: false, fresh: true, featId: null, cycle: true }); Object.assign(anims.opt, { t: 0, feature: 0, playing: true }); render(); return; }
   if (t.dataset.opt !== undefined) { S.ed.opt = t.dataset.opt === 'cur' ? 'cur' : +t.dataset.opt; Object.assign(anims.opt, { t: 0, feature: 0, playing: true }); render(); return; }
@@ -2118,8 +2138,9 @@ document.addEventListener('pointerdown', e => {
   if (!S.canWrite) return;
   const h = e.target.closest('.board-svg .lhg'), g = h ? null : e.target.closest('.drag .tok'); if (!h && !g) return;
   const svg = (h || g).ownerSVGElement, L = curL(), r = +svg.dataset.r, rot = rotOf(L, r);
+  const snap = rotSnap(rot);
   if (h) { linesMat(L, r); }
-  dragging = { g: h || g, svg, id: (h || g).dataset.id, hd: h ? h.dataset.lh : null, rot, L, r, moved: false, x0: e.clientX, y0: e.clientY, board: svg.classList.contains('board-svg') };
+  dragging = { snap, g: h || g, svg, id: (h || g).dataset.id, hd: h ? h.dataset.lh : null, rot, L, r, moved: false, x0: e.clientX, y0: e.clientY, board: svg.classList.contains('board-svg') };
   (h || g).classList.add('dragging'); svg.setPointerCapture && svg.setPointerCapture(e.pointerId); e.preventDefault();
 });
 document.addEventListener('pointermove', e => {
@@ -2145,6 +2166,7 @@ document.addEventListener('pointerup', () => {
   if (!dragging) return;
   const d = dragging; dragging = null;
   const cur = S.lineups.find(x => x.id === d.L.id) || d.L;
+  if (d.moved || (d.board && !d.hd)) bdPush(cur, d.r, d.snap);      // a drag, or a tap that toggles a line
   if (d.moved) {
     if (cur !== d.L) { const cr = rotOf(cur, d.r); cr.spots[d.id] = d.rot.spots[d.id]; if (d.rot.lines) cr.lines = d.rot.lines; }
     saveLineup(cur); render();
@@ -2503,6 +2525,7 @@ document.addEventListener('change', e => {
   }
 });
 document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !e.target.closest('input,textarea,select,[contenteditable]') && S.view === 'board' && !S.ed && !S.dlg && !S.home) { e.preventDefault(); bdUndo(); return; }
   if (e.key === 'Escape' && (S.tdlg || S.bk)) { S.tdlg = null; S.bk = null; render(); }
   if (e.key === 'Enter' && S.tdlg && S.tdlg.editId && (e.target.id === 'tName' || e.target.id === 'tSeason')) { e.preventDefault(); document.querySelector('[data-act="tdlg-save"]')?.click(); }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.tcard')) { e.preventDefault(); openTeam(e.target.dataset.team); render(); }
