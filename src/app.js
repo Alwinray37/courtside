@@ -827,7 +827,7 @@ function boardView() {
     <div class="viewtog bd-mode" role="tablist" aria-label="Show"><button data-act="bd-mode" data-m="base" aria-selected="${!!S.bd.base}">Rotation base</button><button data-act="bd-mode" data-m="sr" aria-selected="${!S.bd.base && !S.bd.def}">Serve receive</button><button data-act="bd-mode" data-m="def" aria-selected="${!!S.bd.def}">Defense</button></div>
     <div class="bigcourt bd-court${S.bd.base ? ' base' : ''}${S.bd.def ? ' def' : ''}">${courtSVG(L, r, { big: true, drag: S.canWrite && !S.bd.base && !S.bd.def && !preview, board: true, issues: iss })}</div>
     <p class="hint">${S.bd.def ? 'Base defense after the serve: front row at the net, zones 5 and 1 up at the 10-foot line, zone 6 deep. Drag players to try other spots; moves aren’t saved.' : preview ? 'Preview only. Save it to use this libero setup on the Rotations cards and in the live set; dragging is off until then.' : S.bd.base ? 'Where each player stands in the rotation order before the serve. Switch back to Serve receive to see them move to their spots.' : 'Drag players to move them. Tap a player to add or remove her attack line, then drag the line’s end or its middle dot to shape it.'}</p>
-    ${S.bd.def ? `<div class="btnrow" style="justify-content:center;margin-top:6px">${S.bd.defOv && Object.keys(S.bd.defOv).length ? '<button class="btn ghost" data-act="bd-def-reset">Reset defense</button>' : ''}</div>` : `<div class="btnrow" style="justify-content:center;margin-top:6px">${rot.lines ? `<button class="btn ghost" data-act="bd-reset">Reset lines to set calls</button>` : ''}<button class="btn ghost" data-act="bd-clear">Clear lines</button></div>`}
+    ${S.bd.def ? `<div class="btnrow" style="justify-content:center;margin-top:6px">${S.bd.defOv && Object.keys(S.bd.defOv).length ? '<button class="btn ghost" data-act="bd-def-reset">Reset defense</button>' : ''}</div>` : `<div class="btnrow" style="justify-content:center;margin-top:6px">${!S.bd.base && !preview && S.canWrite ? (S.bd.srConfirm === r ? `<span class="confirm">Reset rotation ${r} to the default formation? <button class="btn danger" data-act="bd-sr-reset-yes">Reset</button><button class="btn ghost" data-act="bd-sr-reset-no">Keep</button></span>` : `<button class="btn ghost" data-act="bd-sr-reset">Reset positions</button>`) : ''}${rot.lines ? `<button class="btn ghost" data-act="bd-reset">Reset lines to set calls</button>` : ''}<button class="btn ghost" data-act="bd-clear">Clear lines</button></div>`}
     <div class="libmode" role="radiogroup" aria-label="Libero">${[['none', 'No libero'], ['mb', 'Libero for MB'], ['oh', 'Libero for OH']].map(([v, t]) => `<label class="tog"><input type="radio" name="bdlib" value="${v}" ${S.bd.lib === v ? 'checked' : ''}> ${t}${v === saved ? ' <span class="small">(saved)</span>' : ''}</label>`).join('')}
       ${preview ? `<button class="btn primary" data-act="bd-lib-save">Save to rotations &amp; live set</button>` : ''}</div>
     <div class="legend">${legend()}</div>
@@ -1873,9 +1873,16 @@ document.addEventListener('click', e => {
   if (t.dataset.sx) { const n = setTarget(+t.dataset.sx); const b1 = G('Back 1'); toast(`Setter target: ${sxLabel(SXT())}.${n ? ` ${n} sets that key off the setter moved with her${b1 && b1.rel ? ` (Back 1 is now ${(b1.x * 9).toFixed(1)} m from the left)` : ''}.` : ''}`); render(); return; }
   if (t.dataset.lu) { S.cur = t.dataset.lu; S.confirmDel = false; S.review = null; S.fixLog = null; render(); return; }
   if (t.dataset.view) { S.view = t.dataset.view; render(); return; }
-  if (t.dataset.act === 'bd-go') { const r = +t.dataset.r, prev = boardSnap(); S.bd = { ...(S.bd || {}), r, anim: S.bd && S.bd.r !== r ? 'rot' : null, prev, defOv: S.bd && S.bd.r !== r ? {} : S.bd && S.bd.defOv }; render(); return; }
+  if (t.dataset.act === 'bd-go') { const r = +t.dataset.r, prev = boardSnap(); S.bd = { ...(S.bd || {}), r, anim: S.bd && S.bd.r !== r ? 'rot' : null, prev, srConfirm: null, defOv: S.bd && S.bd.r !== r ? {} : S.bd && S.bd.defOv }; render(); return; }
   if (t.dataset.act === 'bd-lib-save' && L) { const N = withLibMode(L, S.bd.lib); L.rotations = N.rotations; L.liberos = N.liberos; saveLineup(L); toast(S.bd.lib === 'none' ? 'Saved: no libero' : `Saved: libero for ${S.bd.lib === 'oh' ? 'OH' : 'MB'} in every rotation`); render(); return; }
-  if (t.dataset.act === 'bd-mode') { const m = t.dataset.m, cur = bdMode(); if (m !== cur) { S.bd.base = m === 'base'; S.bd.def = m === 'def'; S.bd.defOv = {}; S.bd.anim = 'from:' + cur; } render(); return; }
+  if (t.dataset.act === 'bd-mode') { const m = t.dataset.m, cur = bdMode(); if (m !== cur) { S.bd.base = m === 'base'; S.bd.def = m === 'def'; S.bd.defOv = {}; S.bd.srConfirm = null; S.bd.anim = 'from:' + cur; } render(); return; }
+  if (t.dataset.act === 'bd-sr-reset') { S.bd.srConfirm = S.bd.r; render(); return; }
+  if (t.dataset.act === 'bd-sr-reset-no') { S.bd.srConfirm = null; render(); return; }
+  if (t.dataset.act === 'bd-sr-reset-yes' && L) {      // rebuild this rotation's serve-receive spots from its set calls and passers
+    const r = S.bd.r, rot = rotOf(L, r), prev = boardSnap();
+    rot.spots = defaultSpots(L, r, rot);
+    S.bd.srConfirm = null; S.bd.anim = 'rot'; S.bd.prev = prev; saveLineup(L); toast(`Rotation ${r} reset`); render(); return;
+  }
   if (t.dataset.act === 'bd-def-reset') { const prev = boardSnap(); S.bd.defOv = {}; S.bd.anim = 'rot'; S.bd.prev = prev; render(); return; }
   if (t.dataset.act === 'bd-reset' && L) { delete rotOf(L, S.bd.r).lines; saveLineup(L); render(); return; }
   if (t.dataset.act === 'bd-clear' && L) { rotOf(L, S.bd.r).lines = {}; saveLineup(L); render(); return; }
@@ -2291,6 +2298,15 @@ function buildSampleLineup(team) {
 
 /* new lineups reuse the sample lineup's hand-tuned positions, passers and attack calls for every rotation where the setter is in the back row
    (zone 1 = the sample's rotation 1, zone 6 = rotation 2, zone 5 = rotation 3). That makes a 6-2 look like the 5-1 in those rotations. */
+/* default serve-receive spots for a rotation, as building the lineup would place them: the formation for its set calls,
+   or the hand-tuned template when it fits and its calls match this rotation's calls (so set calls are never changed) */
+function defaultSpots(L, r, rot) {
+  const spots = ENG.formationFor(L, r, S.team, rot.calls, ENG.passersOf(L, r, S.team, rot), rot);
+  const T = { spots, calls: clone(rot.calls || {}), passers: rot.passers };
+  applySampleTemplate(L, r, T);
+  const key = o => JSON.stringify(Object.entries(o || {}).sort());
+  return T.spots !== spots && key(T.calls) === key(rot.calls) ? T.spots : spots;
+}
 function applySampleTemplate(L, r, R) {
   const c = ENG.court(L, r); if (!c.setter) return;
   const sz = c.zoneOf[c.setter], tr = { 1: 1, 6: 2, 5: 3 }[sz]; if (!tr) return;
