@@ -41,7 +41,7 @@ Splitting `app.js` into modules is on the backlog.
 
 | Tab | `S.view` | What it does |
 | --- | --- | --- |
-| Board | `board` | Drag players on the court for a rotation; legality shown live |
+| Board | `board` | Per rotation: Serve receive (drag, legality shown live), Rotation base, and Defense (`defenseSpots`, temporary drag + Reset) |
 | Rotations | `rot` | All six rotations at a glance with status |
 | Live set | `live` | Run a match: score, rotate, subs, libero, log, undo |
 | Roster | `roster` | Players, positions, jersey numbers |

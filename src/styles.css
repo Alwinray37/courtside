@@ -480,3 +480,8 @@ details.more .menu button.danger{color:var(--err)}
 /* PWA update prompt (src/pwa.js) */
 .pwa-bar{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:var(--card);color:var(--ink);border:1px solid var(--rule);border-radius:12px;padding:8px 8px 8px 14px;font-weight:600;font-size:14px;z-index:41;box-shadow:var(--shadow);max-width:calc(100vw - 32px)}
 .pwa-bar span{flex:1;white-space:nowrap}
+/* Board: Defense mode (lines and overlap rings don't apply after the serve) */
+.bd-court.def svg [data-line],.bd-court.def svg .lhg,.bd-court.def svg path[class^="r-"],.bd-court.def .tok .ring,.bd-court.def .tok text.zonetxt,.bd-court.def .tgt{opacity:0;pointer-events:none}
+.bd-court.def .tok{cursor:grab;touch-action:none}
+.bd-court.def .tok.dragging{cursor:grabbing}
+.bd-court.def .tok.dragging circle.base{stroke:var(--sun);stroke-width:3}

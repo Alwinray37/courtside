@@ -823,11 +823,11 @@ function boardView() {
         <div class="stepper" aria-label="Rotations">${[1, 2, 3, 4, 5, 6].map(k => `<button data-act="bd-go" data-r="${k}" aria-current="${k === r}">${k}</button>`).join('')}</div>
         <button class="btn" data-act="bd-go" data-r="${r === 6 ? 1 : r + 1}" aria-label="Next rotation">›</button></div>
     </div>
-    ${st ? `<ul class="issues bd-iss">${iss.map(i => `<li class="${i.level}"><span class="ic">${i.level === 'error' ? '!' : '?'}</span><span>${esc(i.msg)}</span></li>`).join('')}</ul>` : ''}
-    <div class="viewtog bd-mode" role="tablist" aria-label="Show"><button data-act="bd-mode" data-m="sr" aria-selected="${!S.bd.base}">Serve receive</button><button data-act="bd-mode" data-m="base" aria-selected="${!!S.bd.base}">Rotation base</button></div>
-    <div class="bigcourt bd-court${S.bd.base ? ' base' : ''}">${courtSVG(L, r, { big: true, drag: S.canWrite && !S.bd.base && !preview, board: true, issues: iss })}</div>
-    <p class="hint">${preview ? 'Preview only. Save it to use this libero setup on the Rotations cards and in the live set; dragging is off until then.' : S.bd.base ? 'Where each player stands in the rotation order before the serve. Switch back to Serve receive to see them move to their spots.' : 'Drag players to move them. Tap a player to add or remove her attack line, then drag the line’s end or its middle dot to shape it.'}</p>
-    <div class="btnrow" style="justify-content:center;margin-top:6px">${rot.lines ? `<button class="btn ghost" data-act="bd-reset">Reset lines to set calls</button>` : ''}<button class="btn ghost" data-act="bd-clear">Clear lines</button></div>
+    ${st && !S.bd.def ? `<ul class="issues bd-iss">${iss.map(i => `<li class="${i.level}"><span class="ic">${i.level === 'error' ? '!' : '?'}</span><span>${esc(i.msg)}</span></li>`).join('')}</ul>` : ''}
+    <div class="viewtog bd-mode" role="tablist" aria-label="Show"><button data-act="bd-mode" data-m="sr" aria-selected="${!S.bd.base && !S.bd.def}">Serve receive</button><button data-act="bd-mode" data-m="base" aria-selected="${!!S.bd.base}">Rotation base</button><button data-act="bd-mode" data-m="def" aria-selected="${!!S.bd.def}">Defense</button></div>
+    <div class="bigcourt bd-court${S.bd.base ? ' base' : ''}${S.bd.def ? ' def' : ''}">${courtSVG(L, r, { big: true, drag: S.canWrite && !S.bd.base && !S.bd.def && !preview, board: true, issues: iss })}</div>
+    <p class="hint">${S.bd.def ? 'Base defense after the serve: front row at the net, zones 5 and 1 up at the 10-foot line, zone 6 deep. Drag players to try other spots; moves aren’t saved.' : preview ? 'Preview only. Save it to use this libero setup on the Rotations cards and in the live set; dragging is off until then.' : S.bd.base ? 'Where each player stands in the rotation order before the serve. Switch back to Serve receive to see them move to their spots.' : 'Drag players to move them. Tap a player to add or remove her attack line, then drag the line’s end or its middle dot to shape it.'}</p>
+    ${S.bd.def ? `<div class="btnrow" style="justify-content:center;margin-top:6px">${S.bd.defOv && Object.keys(S.bd.defOv).length ? '<button class="btn ghost" data-act="bd-def-reset">Reset defense</button>' : ''}</div>` : `<div class="btnrow" style="justify-content:center;margin-top:6px">${rot.lines ? `<button class="btn ghost" data-act="bd-reset">Reset lines to set calls</button>` : ''}<button class="btn ghost" data-act="bd-clear">Clear lines</button></div>`}
     <div class="libmode" role="radiogroup" aria-label="Libero">${[['none', 'No libero'], ['mb', 'Libero for MB'], ['oh', 'Libero for OH']].map(([v, t]) => `<label class="tog"><input type="radio" name="bdlib" value="${v}" ${S.bd.lib === v ? 'checked' : ''}> ${t}${v === saved ? ' <span class="small">(saved)</span>' : ''}</label>`).join('')}
       ${preview ? `<button class="btn primary" data-act="bd-lib-save">Save to rotations &amp; live set</button>` : ''}</div>
     <div class="legend">${legend()}</div>
@@ -1794,21 +1794,61 @@ function render() {
 /* Board: slide the tokens between rotations, and between their serve-receive spots and their rotation base (zones 4-3-2 / 5-6-1) */
 const BZ = { 4: [0.17, 0.24], 3: [0.5, 0.24], 2: [0.83, 0.24], 5: [0.17, 0.68], 6: [0.5, 0.68], 1: [0.83, 0.68] };
 const srT = g => { const m = /translate\(([-\d.]+),\s*([-\d.]+)\)/.exec(g.getAttribute('transform') || ''); return m ? `translate(${m[1]}px, ${m[2]}px)` : ''; };
+const bdMode = () => S.bd && S.bd.def ? 'def' : S.bd && S.bd.base ? 'base' : 'sr';
+/* Defense: base defensive spots after the serve.
+   Front row at the net: setter/opposite zone 2, middle zone 3, outside zone 4.
+   Back row: setter/opposite zone 1 and zone 5 just behind the 10-foot line, zone 6 deep.
+   The libero takes zone 5 first, so a back-row middle playing with her moves to zone 6. */
+const DEF_XY = { 4: [0.13, 0.09], 3: [0.5, 0.09], 2: [0.87, 0.09], 5: [0.12, 0.43], 6: [0.5, 0.88], 1: [0.88, 0.43] };
+const DEF_PREF = {
+  F: { opp: [2, 3, 4], mid: [3, 4, 2], out: [4, 3, 2], '': [4, 3, 2] },
+  B: { lib: [5, 6, 1], opp: [1, 6, 5], mid: [5, 6, 1], out: [6, 5, 1], '': [6, 5, 1] }
+};
+const DEF_ORDER = ['lib', 'opp', 'mid', 'out', ''];
+function defenseSpots(L, r) {
+  const c = ENG.court(L, r), out = {}, taken = new Set();
+  const kindOf = id => c.libero && c.libero.id === id ? 'lib' : id === c.setter ? 'opp' : roleOf(L, id) || '';
+  Object.entries(c.zones).map(([z, id]) => ({ id, row: isF(+z) ? 'F' : 'B', k: kindOf(id) }))
+    .sort((a, b) => DEF_ORDER.indexOf(a.k) - DEF_ORDER.indexOf(b.k))
+    .forEach(p => { const z = (DEF_PREF[p.row][p.k] || DEF_PREF[p.row]['']).find(z => !taken.has(z)); taken.add(z); out[p.id] = DEF_XY[z].slice(); });
+  return out;
+}
+let ddrag = null;      // dragging a token in Defense (temporary: kept in S.bd.defOv, never saved)
+document.addEventListener('pointerdown', e => {
+  const g = e.target.closest('.bd-court.def:not(.moving) .tok'); if (!g) return;
+  const svg = g.ownerSVGElement; ddrag = { g, svg, id: g.dataset.id, moved: false, x0: e.clientX, y0: e.clientY };
+  g.classList.add('dragging'); svg.setPointerCapture && svg.setPointerCapture(e.pointerId); e.preventDefault();
+});
+document.addEventListener('pointermove', e => {
+  const d = ddrag; if (!d) return;
+  if (!d.moved && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 5) return;
+  d.moved = true;
+  const [px, py] = svgXY(d.svg, e), x = Math.min(.98, Math.max(.02, px)), y = Math.min(.99, Math.max(.02, py));
+  S.bd.defOv = S.bd.defOv || {}; S.bd.defOv[d.id] = [x, y];
+  d.g.style.transition = 'none'; d.g.style.transform = `translate(${X(x).toFixed(1)}px, ${Y(y).toFixed(1)}px)`;
+});
+document.addEventListener('pointerup', () => {
+  const d = ddrag; if (!d) return; ddrag = null;
+  d.g.classList.remove('dragging');
+  if (d.moved && !document.querySelector('[data-act="bd-def-reset"]')) render();     // show the Reset button
+});
 function boardSnap() {   // where every token is right now, before the board re-renders
   const out = {}; document.querySelectorAll('.bd-court svg .tok[data-id]').forEach(g => { out[g.dataset.id] = g.style.transform || srT(g); }); return out;
 }
 function boardAnim() {
   const box = S.view === 'board' && document.querySelector('.bd-court'), svg = box && box.querySelector('svg'), L = curL(); if (!svg || !L || !S.bd) return;
   const mode = S.bd.anim, prev = S.bd.prev || {}; S.bd.anim = null; S.bd.prev = null;
-  if (!S.bd.base && !mode) return;
-  const c = ENG.court(S.bdL || L, S.bd.r);
+  if (!S.bd.base && !S.bd.def && !mode) return;
+  const c = ENG.court(S.bdL || L, S.bd.r), D = S.bd.def || mode === 'from:def' ? defenseSpots(S.bdL || L, S.bd.r) : {};
   const toks = [...svg.querySelectorAll('.tok[data-id]')];
   const baseT = g => { const p = BZ[c.zoneOf[g.dataset.id]]; return p ? `translate(${X(p[0]).toFixed(1)}px, ${Y(p[1]).toFixed(1)}px)` : ''; };
-  const endT = g => S.bd.base ? baseT(g) : srT(g);
-  const fromT = g => mode === 'toBase' ? srT(g) : mode === 'toSR' ? baseT(g) : mode === 'rot' ? prev[g.dataset.id] || null : endT(g);
+  const defT = g => { const id = g.dataset.id, p = (S.bd.def && S.bd.defOv && S.bd.defOv[id]) || D[id]; return p ? `translate(${X(p[0]).toFixed(1)}px, ${Y(p[1]).toFixed(1)}px)` : ''; };
+  const posT = (m, g) => m === 'base' ? baseT(g) : m === 'def' ? defT(g) : srT(g);
+  const endT = g => posT(bdMode(), g);
+  const fromT = g => mode && mode.startsWith('from:') ? posT(mode.slice(5), g) : mode === 'rot' ? prev[g.dataset.id] || null : endT(g);
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   toks.forEach(g => { g.style.transition = 'none'; const f = fromT(g); if (f === null) { g.style.opacity = '0'; g.style.transform = endT(g); } else g.style.transform = f; });
-  const finish = () => toks.forEach(g => { if (!g.isConnected) return; g.style.transition = ''; g.style.opacity = ''; if (!S.bd.base) g.style.transform = ''; });
+  const finish = () => toks.forEach(g => { if (!g.isConnected) return; g.style.transition = ''; g.style.opacity = ''; if (bdMode() === 'sr') g.style.transform = ''; });
   if (!mode || reduce) { toks.forEach(g => { g.style.transform = endT(g); }); finish(); return; }
   box.classList.add('moving');
   svg.getBoundingClientRect();
@@ -1830,9 +1870,10 @@ document.addEventListener('click', e => {
   if (t.dataset.sx) { const n = setTarget(+t.dataset.sx); const b1 = G('Back 1'); toast(`Setter target: ${sxLabel(SXT())}.${n ? ` ${n} sets that key off the setter moved with her${b1 && b1.rel ? ` (Back 1 is now ${(b1.x * 9).toFixed(1)} m from the left)` : ''}.` : ''}`); render(); return; }
   if (t.dataset.lu) { S.cur = t.dataset.lu; S.confirmDel = false; S.review = null; S.fixLog = null; render(); return; }
   if (t.dataset.view) { S.view = t.dataset.view; render(); return; }
-  if (t.dataset.act === 'bd-go') { const r = +t.dataset.r, prev = boardSnap(); S.bd = { ...(S.bd || {}), r, anim: S.bd && S.bd.r !== r ? 'rot' : null, prev }; render(); return; }
+  if (t.dataset.act === 'bd-go') { const r = +t.dataset.r, prev = boardSnap(); S.bd = { ...(S.bd || {}), r, anim: S.bd && S.bd.r !== r ? 'rot' : null, prev, defOv: S.bd && S.bd.r !== r ? {} : S.bd && S.bd.defOv }; render(); return; }
   if (t.dataset.act === 'bd-lib-save' && L) { const N = withLibMode(L, S.bd.lib); L.rotations = N.rotations; L.liberos = N.liberos; saveLineup(L); toast(S.bd.lib === 'none' ? 'Saved: no libero' : `Saved: libero for ${S.bd.lib === 'oh' ? 'OH' : 'MB'} in every rotation`); render(); return; }
-  if (t.dataset.act === 'bd-mode') { const b = t.dataset.m === 'base'; if (b !== !!S.bd.base) { S.bd.base = b; S.bd.anim = b ? 'toBase' : 'toSR'; } render(); return; }
+  if (t.dataset.act === 'bd-mode') { const m = t.dataset.m, cur = bdMode(); if (m !== cur) { S.bd.base = m === 'base'; S.bd.def = m === 'def'; S.bd.defOv = {}; S.bd.anim = 'from:' + cur; } render(); return; }
+  if (t.dataset.act === 'bd-def-reset') { const prev = boardSnap(); S.bd.defOv = {}; S.bd.anim = 'rot'; S.bd.prev = prev; render(); return; }
   if (t.dataset.act === 'bd-reset' && L) { delete rotOf(L, S.bd.r).lines; saveLineup(L); render(); return; }
   if (t.dataset.act === 'bd-clear' && L) { rotOf(L, S.bd.r).lines = {}; saveLineup(L); render(); return; }
   if (t.dataset.open) { S.ed = { r: +t.dataset.open, view: 'anim' }; S.sug = null; Object.assign(anims.top, { t: 0, feature: 0, playing: false, fresh: true, featId: null, cycle: true }); Object.assign(anims.opt, { t: 0, feature: 0, playing: true }); render(); return; }
