@@ -485,3 +485,4 @@ details.more .menu button.danger{color:var(--err)}
 .bd-court.def .tok{cursor:grab;touch-action:none}
 .bd-court.def .tok.dragging{cursor:grabbing}
 .bd-court.def .tok.dragging circle.base{stroke:var(--sun);stroke-width:3}
+.privacy-note{max-width:760px;margin:32px auto 20px;padding:14px 0;border-top:1px solid var(--rule);color:var(--ink-3);font-size:12px;line-height:1.5}

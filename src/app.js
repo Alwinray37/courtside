@@ -1690,15 +1690,18 @@ function fixPanel(L, onlyR) {
 }
 
 /* ---------- render ---------- */
+function privacyFooter() {
+  return '<footer class="privacy-note">Privacy: Team, player, lineup, and live set data are saved in this browser on this device. Courtside has no account or server for your data. Download a backup to keep or move it.</footer>';
+}
 function render() {
   const app = $('#app');
-  if (S.home || !S.team) { app.innerHTML = homeView(); $('#overlay').innerHTML = teamDlgView() + backupView(); document.body.style.overflow = S.tdlg || S.bk ? 'hidden' : ''; return; }
+  if (S.home || !S.team) { app.innerHTML = homeView() + privacyFooter(); $('#overlay').innerHTML = teamDlgView() + backupView(); document.body.style.overflow = S.tdlg || S.bk ? 'hidden' : ''; return; }
   if (S.cur && !curL()) S.cur = null;
   if (!S.cur && S.lineups[0]) S.cur = S.lineups[0].id;
   const scrollY = window.scrollY;
   teamKey = JSON.stringify([S.team.glossary, S.team.players.map(p => [p.id, p.roles, p.hand, p.backRow, p.passer, p.calls, p.cant])]);
   const body = { board: boardView, rot: rotView, serve: serveView, live: liveView, roster: rosterView, calls: callsView }[S.view]();
-  app.innerHTML = header() + tabs() + body;
+  app.innerHTML = header() + tabs() + body + privacyFooter();
   const oldSheet = document.querySelector('#overlay .sheet'), sheetY = oldSheet ? oldSheet.scrollTop : 0, sameSheet = oldSheet && !!S.ed === !!oldSheet.querySelector('[aria-label^="Rotation"]');
   $('#overlay').innerHTML = editor() + dlgView() + backupView() + teamDlgView();
   const newSheet = document.querySelector('#overlay .sheet');

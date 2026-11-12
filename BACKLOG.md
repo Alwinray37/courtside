@@ -9,7 +9,7 @@
 - [ ] Split `src/app.js` into modules: board, rotations, live set, roster, set library, storage
 - [ ] End-to-end tests with Playwright in CI
 - [x] Remove dead code left from the Claude artifact version (AI review, club feedback, old migrations)
-- [ ] Privacy note in the app footer (what's stored, where)
+- [x] Privacy note in the app footer (what's stored, where)
 
 ## Next: full-stack version
 
