@@ -27,3 +27,27 @@ test('backup can be downloaded from the home screen', async ({ page }) => {
   const file = await download;
   expect(file.suggestedFilename()).toMatch(/courtside-backup.*\.json$/);
 });
+
+test('board, set library, and live scoring work after reload', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('.');
+  await page.locator('.tcard [data-team]').first().click();
+  await page.getByRole('button', { name: 'Next rotation' }).click();
+  await expect(page.locator('.bd-head .num')).toHaveText('2');
+  await page.getByRole('button', { name: 'Defense' }).click();
+  await expect(page.getByRole('button', { name: 'Defense' })).toHaveAttribute('aria-selected', 'true');
+
+  await page.getByRole('tab', { name: 'Set library' }).click();
+  await expect(page.getByRole('button', { name: 'Quicks' })).toBeVisible();
+  await page.getByRole('button', { name: 'Quicks' }).click();
+  await expect(page.getByRole('button', { name: 'Quicks' })).toHaveAttribute('aria-pressed', 'true');
+
+  await page.getByRole('tab', { name: 'Live set' }).click();
+  await page.getByRole('button', { name: 'We serve' }).click();
+  await page.getByRole('button', { name: 'Point for us' }).click();
+  await expect(page.getByRole('button', { name: 'Point for us' })).toHaveText('1');
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Point for us' })).toHaveText('1');
+  expect(errors).toEqual([]);
+});

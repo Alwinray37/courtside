@@ -10,6 +10,7 @@ Volleyball serve-receive lineups, rotations and live set tracking. A static web 
 npm ci          # install dependencies
 npm run dev     # local dev server at http://localhost:5173/courtside/
 npm test        # engine unit tests (Vitest)
+npm run test:e2e # browser tests (Playwright)
 npm run build   # production build into dist/
 npm run preview # serve dist/ locally (use this to test offline/PWA)
 ```

@@ -5,13 +5,13 @@
 1. `npm run dev` and open http://localhost:5173/courtside/
 2. Edit `src/`. The page hot-reloads.
 3. If you touched `engine.js`, add or update a test in `tests/engine.test.js` and run `npm test`.
-4. Before pushing, run `npm test && npm run build && npm run preview` and click through the app once.
+4. Before pushing, run `npm test && npm run build && npm run test:e2e`.
 
 Note that `localhost` and the live site have **separate storage**. Your real team on the live site isn't visible locally. To test with it, download a backup on the live site and restore it locally (see [DATA.md](DATA.md)).
 
 ## Deploying
 
-Pushing to `main` triggers [.github/workflows/deploy.yml](../.github/workflows/deploy.yml). The workflow runs `npm ci`, `npm test` and `npm run build`, then publishes `dist/` to GitHub Pages. If the tests fail, nothing deploys.
+Pushing to `main` triggers [.github/workflows/deploy.yml](../.github/workflows/deploy.yml). The workflow runs `npm ci`, `npm test`, `npm run build`, and `npm run test:e2e`, then publishes `dist/` to GitHub Pages. If the tests fail, nothing deploys.
 
 One-time setup (already done if the site is live): in the GitHub repo, open **Settings → Pages → Source** and choose **GitHub Actions**.
 
