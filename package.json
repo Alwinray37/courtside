@@ -9,9 +9,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "icons": "pwa-assets-generator"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@vite-pwa/assets-generator": "^2.0.0",
     "vite": "^6.3.5",
     "vite-plugin-pwa": "^2.0.0",

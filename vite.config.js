@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 // GitHub Pages serves the site at https://<username>.github.io/courtside/
 export default defineConfig({
   base: '/courtside/',
-  test: { environment: 'node' },
+  test: { environment: 'node', exclude: ['tests/e2e/**', 'node_modules/**'] },
   plugins: [
     VitePWA({
       // new versions install in the background; the app shows a "Reload" prompt (see src/pwa.js)

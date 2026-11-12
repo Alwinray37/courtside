@@ -7,7 +7,7 @@
 - [x] Backup/restore by file or pasted text
 - [x] Installable PWA with offline support (service worker), so it works in gyms with bad Wi-Fi
 - [ ] Split `src/app.js` into modules: board, rotations, live set, roster, set library, storage
-- [ ] End-to-end tests with Playwright in CI
+- [x] End-to-end tests with Playwright in CI
 - [x] Remove dead code left from the Claude artifact version (AI review, club feedback, old migrations)
 - [x] Privacy note in the app footer (what's stored, where)
 
