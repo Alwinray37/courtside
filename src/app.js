@@ -11,9 +11,8 @@ const SYS = {
   '6-2': { label: '6-2', d: 'Two setters opposite; back-row one sets. Front-row one hits or subs out for a hitter.' },
   '4-2': { label: '4-2', d: 'Two setters opposite; front-row one sets.' }
 };
-const S = { team: null, lineups: [], cur: null, view: 'board', bd: { r: 1 }, ed: null, sug: null, ai: null, review: null, dlg: null,
-  confirmDel: false, fixLog: null, publicCopy: false, fb: null, canWrite: true, sandbox: false, comments: null, remote: {}, db: null, sample: null, loadingTeam: true, loadingLu: true, dbMissing: false, live: null };
-const sandboxed = new Set();
+const S = { team: null, lineups: [], cur: null, view: 'board', bd: { r: 1 }, ed: null, sug: null, dlg: null,
+  confirmDel: false, fixLog: null, canWrite: true, live: null };
 let dragging = null;
 
 const $ = s => document.querySelector(s);
@@ -86,8 +85,6 @@ function persist() {
   DB.cur = S.team ? S.team.id : null;
   writeStore();
 }
-function dlog() {}
-function sig() { return ''; }
 function setSave(state, msg = '') { S.save = { state, msg }; const el = document.getElementById('saveState'); if (el) el.outerHTML = saveBadge(); }
 function saveLineup(L) { L.updatedAt = new Date().toISOString(); persist(); }
 function saveTeam() { persist(); }
@@ -745,9 +742,6 @@ function header() {
   </div></div>`;
 }
 const dlIcon = () => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m0 0l-3-3m3 3l3-3M3 12.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-const bubbleIcon = () => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5v6a1.5 1.5 0 01-1.5 1.5H7l-3.2 2.6c-.3.3-.8 0-.8-.4V11h0a1.5 1.5 0 01-1-1.4z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>`;
-function sandboxBar() { return ''; }
-const starIcon = () => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l1.6 4.4L14 7l-4.4 1.6L8 13l-1.6-4.4L2 7l4.4-1.6z" fill="currentColor"/></svg>`;
 function sysLine(L) {
   const s = L.setters || [];
   if (L.system === '5-2' && L.swaps && L.swaps[0]) return `${full(L.swaps[0].starter)} sets from the back row, ${full(L.swaps[0].sub)} subs in to set from the front row`;
@@ -782,7 +776,7 @@ function rotView() {
   const sum = errs || warns
     ? `${S.canWrite ? `<button class="btn primary" data-act="autofix-all">Fix all</button>` : ''}<span class="pill ${errs ? 'err' : 'warn'}">${errs ? `${errs} rule problem${errs > 1 ? 's' : ''}` : ''}${errs && warns ? ' · ' : ''}${warns ? `${warns} to check` : ''}</span>${chips.join('')}`
     : '';
-  return `${sum ? `<div class="summary">${sum}</div>` : ''}${fixPanel(L)}${reviewPanel()}<div class="board">${cards}</div>
+  return `${sum ? `<div class="summary">${sum}</div>` : ''}${fixPanel(L)}<div class="board">${cards}</div>
   <div class="legend" style="margin-top:22px">${legend()}</div>`;
 }
 
@@ -857,12 +851,6 @@ function legend() {
   <span><svg viewBox="0 0 26 8"><line x1="1" y1="4" x2="25" y2="4" class="r-set"/></svg>Setter release</span>
   <span><svg viewBox="0 0 26 8"><line x1="1" y1="4" x2="25" y2="4" class="c-ten"/></svg>10-ft line</span>
   ${[['--sun', 'Setter'], ['--r-opp', 'Opposite'], ['--r-out', 'Outside'], ['--r-mid', 'Middle'], ['--lib', 'Libero']].map(([v, t]) => `<span><svg viewBox="0 0 12 12" style="width:12px;height:12px"><circle cx="6" cy="6" r="5.5" fill="var(${v})"/></svg>${t}</span>`).join('')}`;
-}
-function reviewPanel() {
-  if (!S.review) return '';
-  const R = S.review;
-  const body = R.error ? `<p class="err-text">${esc(R.error)}</p>` : R.text ? `<ul class="rules" style="margin-top:6px">${R.text.split('\n').map(l => l.replace(/^\s*[-•*]\s*/, '').trim()).filter(Boolean).map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : `<p><span class="spin"></span> Claude is reviewing all six rotations…</p>`;
-  return `<div class="ai" style="margin:0 0 18px"><div style="display:flex;align-items:center;gap:8px"><h4 style="flex:1">${starIcon()} Claude’s review of ${esc(R.title)}</h4><button class="btn ghost" data-act="review-close">Close</button></div>${body}</div>`;
 }
 
 function serveView() {
@@ -1331,8 +1319,8 @@ function editor() {
       </div>
       <div class="sec"><h3>Rule check</h3><ul class="issues">${isu}</ul></div>
       <div class="sec"><h3>Tools</h3>
-        <div class="btnrow">${S.canWrite ? `${iss.some(i => i.level !== 'info') ? `<button class="btn primary" data-act="autofix" data-r="${r}">Fix this rotation</button>` : ''}<button class="btn primary" data-act="lineup">Line up for these sets</button><button class="btn" data-act="rebuild">Rebuild formation</button>` : ''}${S.sample ? `<button class="btn sun" data-act="ask">${starIcon()} Ask Claude</button>` : ''}</div>
-        ${fixPanel(L, r)}${aiPanel(L, r)}</div>
+        <div class="btnrow">${S.canWrite ? `${iss.some(i => i.level !== 'info') ? `<button class="btn primary" data-act="autofix" data-r="${r}">Fix this rotation</button>` : ''}<button class="btn primary" data-act="lineup">Line up for these sets</button><button class="btn" data-act="rebuild">Rebuild formation</button>` : ''}</div>
+        ${fixPanel(L, r)}</div>
     </div></div>${designer(L, r)}</div></div>`;
 }
 function sugPanel(L, r) {
@@ -1343,18 +1331,6 @@ function sugPanel(L, r) {
   return `<div class="ai" style="background:var(--rule-2);border-color:var(--rule)"><div class="lbl">Rules engine suggestion · combo ${g1} vs ${g0} now</div>
     <ul class="calls" style="grid-template-columns:1fr">${Object.entries(calls).map(([id, code]) => `<li><span class="who">${esc(nm(id))}</span><span class="what">${esc(code)}</span><span class="small">${esc((why[id] || []).slice(0, 2).join(', '))}</span></li>`).join('')}</ul>
     <div class="btnrow">${same ? '<span class="small">Same as what you have.</span>' : `<button class="btn primary" data-act="apply-sug">Use these calls</button>`}<button class="btn ghost" data-act="dismiss-sug">Dismiss</button></div></div>`;
-}
-function aiPanel(L, r) {
-  const A = S.ai; if (!A || A.r !== r || A.lu !== L.id) return '';
-  if (A.loading) return `<div class="ai"><p><span class="spin"></span> Claude is working through rotation ${r}…</p></div>`;
-  if (A.error) return `<div class="ai"><p class="err-text">${esc(A.error)}</p></div>`;
-  const d = A.data;
-  const list = calls => `<ul class="calls" style="grid-template-columns:1fr 1fr">${Object.entries(calls).map(([id, code]) => `<li><span class="who">${esc(nm(id))}</span><span class="what">${esc(code)}</span></li>`).join('')}</ul>`;
-  return `<div class="ai"><h4>${starIcon()} ${esc(d.headline || 'Claude’s recommendation')}</h4>${list(d.calls)}
-    ${(d.reasoning || []).length ? `<ul class="rules">${d.reasoning.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
-    ${d.watch ? `<p><span class="lbl">Watch for</span><br>${esc(d.watch)}</p>` : ''}
-    ${S.canWrite ? `<div class="btnrow"><button class="btn primary" data-act="apply-ai">Use these calls</button></div>` : ''}
-    ${d.alternative && d.alternative.calls && Object.keys(d.alternative.calls).length ? `<div class="sec"><div class="lbl">Alternative${d.alternative.when ? ` · ${esc(d.alternative.when)}` : ''}</div>${list(d.alternative.calls)}${S.canWrite ? `<button class="btn" data-act="apply-ai-alt">Use the alternative</button>` : ''}</div>` : ''}</div>`;
 }
 
 /* ---------- new / edit lineup dialog ---------- */
@@ -1689,7 +1665,6 @@ function fixRotations(L, rs) {
   });
   if (!items.length) { toast('Nothing to fix'); return; }
   S.fixLog = { lu: L.id, items, fresh: true }; S.sug = null;
-  dlog('fix', { id: L.id, rs: items.map(i => i.r), moved: items.map(i => Object.keys(i.moves).join('+')).join(','), sig: sig(L) });
   saveLineup(L, items.map(i => i.r)); render();
   toast(items.length === 1 ? `Fixed rotation ${items[0].r}` : `Fixed ${items.length} rotations`);
 }
@@ -1714,99 +1689,21 @@ function fixPanel(L, onlyR) {
     <p class="small" style="margin:6px 0 0">Dashed circles show where players stood before. Calls that were still legal were kept.</p></div>`;
 }
 
-/* ---------- Claude ---------- */
-function brief(L, r) {
-  const rot = ensureSpots(L, r), c = ENG.court(L, r);
-  const zl = { 1: 'right back', 2: 'right front', 3: 'middle front', 4: 'left front', 5: 'left back', 6: 'middle back' };
-  const lines = [4, 3, 2, 5, 6, 1].map(z => {
-    const id = c.zones[z], p = P(id), sp = rot.spots[id] || [.5, .5];
-    const role = id === c.setter ? 'SETTING this rotation' : c.libero && c.libero.id === id ? 'libero' : `positions ${p.roles.join('/') || 'unknown'}${p.roles.includes('S') ? ' (setter not setting this rotation, so she can attack)' : ''}`;
-    return `- Zone ${z} (${zl[z]}, ${isF(z) ? 'FRONT row' : 'BACK row'}): id ${id}, ${full(id)}; ${role}; ${p.hand === 'L' ? 'left' : 'right'}-handed; back-row attacker: ${p.backRow ? 'yes' : 'no'}; primary passer: ${p.passer ? 'yes' : 'no'}; receive spot ${Math.round(sp[0] * 100)}% from left sideline, ${(sp[1] * 9).toFixed(1)} m from net${p.notes ? `; coach notes: ${p.notes}` : ''}${(p.calls || []).length ? `; calls she already runs: ${p.calls.join(', ')}` : ''}`;
-  });
-  const gl = S.team.glossary.map(g => `- ${g.code}: ${g.row === 'F' ? 'front-row' : 'back-row'} attack, lane ${Math.round(g.x * 100)}% from left antenna, ${['', 'quick', 'medium', 'high'][g.tempo]} tempo, usually ${(g.roles || []).join('/')}: ${g.desc}`);
-  const iss = ENG.callCheck(L, r, S.team, rot).map(i => `- ${i.level}: ${i.msg}`);
-  return `Team: ${S.team.name} (club volleyball, USAV rules).
-Lineup: "${L.name}". Offense ${L.system}. ${sysLine(L)}.
-Rotation ${r} of 6, serve receive. ${c.setter ? `${full(c.setter)} sets from zone ${c.zoneOf[c.setter]} and releases to the target between zones 2 and 3.` : ''}${c.libero ? ` Libero ${full(c.libero.id)} is in for ${full(c.libero.replaces)}.` : ''}
-Players on court:
-${lines.join('\n')}
-Team set-call glossary (only these codes exist):
-${gl.join('\n')}
-Current calls: ${Object.entries(rot.calls).filter(([, v]) => v).map(([id, code]) => `${id}=${code}`).join(', ') || 'none'}
-Rule check results:
-${iss.join('\n') || '- none, all legal'}
-${rot.note ? `Coach note: ${rot.note}` : ''}`;
-}
-async function askClaude() {
-  const L = curL(), r = S.ed.r;
-  S.ai = { lu: L.id, r, loading: true }; render();
-  const c = ENG.court(L, r);
-  const prompt = `You are an expert club volleyball coach and USAV rules official helping a coach design first-ball (serve-receive) attack combinations.
-${brief(L, r)}
-
-Our offensive philosophy: get our hitters open nets or one-on-ones. Hold their middle blocker with a quick (1, 3, Back 1, Slide) so pins and the seam behind it face one blocker or none; stretch the block with fast sets to both antennas; overload one blocker with two nearby hitters (Gap-Go, Back 1 + Red, quick + pipe/bic); add a back-row fourth attacker. Every player may run any legal set; prefer sets each hitter can easily reach from her receive spot, don't give passers quicks, and respect handedness (lefties are on-hand on sets behind the setter; sets in front of the setter cross a lefty's body).
-The rules engine's top options for this rotation (score 0-100; per-hitter block read):
-${analysis(L, r).opts.map((o, i) => `- Option ${'ABC'[i]} (${o.score}${o.plays.length ? ', ' + o.plays.join(', ') : ''}): ` + Object.entries(o.calls).map(([id, code]) => `${id}=${code} [${(o.read.per[id] || {}).label || '?'}]`).join(', ')).join('\n')}
-
-Task: recommend the best set-call combination for this rotation. You may agree with an engine option or improve on it. Hard rules: use only codes from the glossary; a BACK-row player may only get back-row calls; the libero and the player who is setting get no call; avoid two front-row attackers in the same lane unless it's a deliberate tandem/X behind a quick.
-Respond with JSON only, in this shape:
-{"calls": {"<player id>": "<code>"}, "headline": "one short sentence naming the plan", "reasoning": ["2 to 4 short bullets a coach can read courtside"], "watch": "one risk to watch for", "alternative": {"calls": {"<player id>": "<code>"}, "when": "when to switch to it"}}`;
-  try {
-    const data = await S.sample.json(prompt, { modelTier: 'default' });
-    const clean = calls => {
-      const out = {};
-      Object.entries((calls && typeof calls === 'object') ? calls : {}).forEach(([id, code]) => {
-        const g = G(String(code)), z = c.zoneOf[id];
-        if (!g || z === undefined || id === c.setter || (c.libero && c.libero.id === id)) return;
-        if (!isF(z) && g.row === 'F') return;
-        out[id] = g.code;
-      });
-      return out;
-    };
-    data.calls = clean(data.calls);
-    if (data.alternative) data.alternative.calls = clean(data.alternative.calls);
-    if (!Object.keys(data.calls).length) throw { code: 'empty' };
-    S.ai = { lu: L.id, r, data };
-  } catch (e) {
-    S.ai = { lu: L.id, r, error: e && e.code === 'rate_limited' ? 'Claude is busy right now. Try again in a minute.' : e && e.code === 'not_granted' ? 'Claude isn’t enabled for this page. Allow it from the page’s permissions to use this.' : 'Claude didn’t return a usable set of calls. Try again.' };
-    if (e && e.code === 'not_granted') S.sample = null;
-  }
-  render();
-}
-async function reviewLineup() {
-  const L = curL();
-  S.review = { title: titleOf(L), text: '' }; render();
-  const all = [1, 2, 3, 4, 5, 6].map(r => { const rot = ensureSpots(L, r); return `=== ROTATION ${r} ===\n${brief(L, r).split('Players on court:')[1].split('Team set-call glossary')[0]}Calls: ${Object.entries(rot.calls).filter(([, v]) => v).map(([id, code]) => `${nm(id)} ${code}`).join(', ')}\nCombo grade ${ENG.grade(L, r, S.team, rot.calls, rot.spots).score}/100\nIssues: ${ENG.callCheck(L, r, S.team, rot).filter(i => i.level !== 'info').map(i => i.msg).join(' ') || 'none'}`; }).join('\n');
-  const prompt = `You are an expert club volleyball coach reviewing a lineup for ${S.team.name} (USAV rules). Offense ${L.system}: ${sysLine(L)}.
-Glossary: ${S.team.glossary.map(g => `${g.code} (${g.row === 'F' ? 'front' : 'back'}, lane ${Math.round(g.x * 100)}%)`).join(', ')}.
-${all}
-
-Write a short review for the coach: the strongest and weakest rotations and why, the specific fixes to make (name players and calls), and any rule problems. Plain text only, no markdown headings or bold. 5 to 7 lines, each starting with "- ". Under 170 words.`;
-  try {
-    await S.sample(prompt, { modelTier: 'default', onText: ({ text }) => { S.review.text = text; softRender(); } });
-  } catch (e) {
-    S.review.error = e && e.code === 'rate_limited' ? 'Claude is busy right now. Try again in a minute.' : 'Claude couldn’t finish the review. Try again.';
-    if (e && e.code === 'not_granted') S.sample = null;
-  }
-  render();
-}
-
 /* ---------- render ---------- */
-let renderQueued = false;
 function render() {
   const app = $('#app');
-  if (S.home || !S.team) { app.innerHTML = homeView(); $('#overlay').innerHTML = teamDlgView() + backupView() + fbView(); document.body.style.overflow = S.tdlg || S.bk || S.fb ? 'hidden' : ''; return; }
+  if (S.home || !S.team) { app.innerHTML = homeView(); $('#overlay').innerHTML = teamDlgView() + backupView(); document.body.style.overflow = S.tdlg || S.bk ? 'hidden' : ''; return; }
   if (S.cur && !curL()) S.cur = null;
   if (!S.cur && S.lineups[0]) S.cur = S.lineups[0].id;
   const scrollY = window.scrollY;
   teamKey = JSON.stringify([S.team.glossary, S.team.players.map(p => [p.id, p.roles, p.hand, p.backRow, p.passer, p.calls, p.cant])]);
   const body = { board: boardView, rot: rotView, serve: serveView, live: liveView, roster: rosterView, calls: callsView }[S.view]();
-  app.innerHTML = header() + sandboxBar() + tabs() + body;
+  app.innerHTML = header() + tabs() + body;
   const oldSheet = document.querySelector('#overlay .sheet'), sheetY = oldSheet ? oldSheet.scrollTop : 0, sameSheet = oldSheet && !!S.ed === !!oldSheet.querySelector('[aria-label^="Rotation"]');
-  $('#overlay').innerHTML = editor() + dlgView() + fbView() + backupView() + teamDlgView();
+  $('#overlay').innerHTML = editor() + dlgView() + backupView() + teamDlgView();
   const newSheet = document.querySelector('#overlay .sheet');
   if (newSheet && sameSheet && (S.ed ? S.ed.keepScroll !== false : !!S.dlg)) newSheet.scrollTop = sheetY;
-  document.body.style.overflow = S.ed || S.dlg || S.fb || S.bk || S.tdlg ? 'hidden' : '';
+  document.body.style.overflow = S.ed || S.dlg || S.bk || S.tdlg ? 'hidden' : '';
   window.scrollTo(0, scrollY);
   animateFix();
   startAnim();
@@ -1877,11 +1774,6 @@ function boardAnim() {
   requestAnimationFrame(() => toks.forEach(g => { g.style.transition = 'transform .7s cubic-bezier(.4,0,.2,1), opacity .5s'; g.style.opacity = '1'; g.style.transform = endT(g); }));
   clearTimeout(boardAnim.t); boardAnim.t = setTimeout(() => { box.classList.remove('moving'); finish(); }, 760);
 }
-function softRender() {
-  const a = document.activeElement;
-  if (dragging || (a && /INPUT|TEXTAREA/.test(a.tagName) && a.type !== 'checkbox' && a.type !== 'range')) { if (!renderQueued) { renderQueued = true; const f = () => { renderQueued = false; softRender(); }; setTimeout(f, 800); } return; }
-  render();
-}
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
@@ -1890,7 +1782,7 @@ document.addEventListener('click', e => {
   const L = curL();
   if (homeClick(t, e)) return;
   if (t.dataset.sx) { const n = setTarget(+t.dataset.sx); const b1 = G('Back 1'); toast(`Setter target: ${sxLabel(SXT())}.${n ? ` ${n} sets that key off the setter moved with her${b1 && b1.rel ? ` (Back 1 is now ${(b1.x * 9).toFixed(1)} m from the left)` : ''}.` : ''}`); render(); return; }
-  if (t.dataset.lu) { S.cur = t.dataset.lu; S.confirmDel = false; S.review = null; S.fixLog = null; render(); return; }
+  if (t.dataset.lu) { S.cur = t.dataset.lu; S.confirmDel = false; S.fixLog = null; render(); return; }
   if (t.dataset.view) { S.view = t.dataset.view; render(); return; }
   if (t.dataset.act === 'bd-go') { const r = +t.dataset.r, prev = boardSnap(); S.bd = { ...(S.bd || {}), r, anim: S.bd && S.bd.r !== r ? 'rot' : null, prev, srConfirm: null, defOv: S.bd && S.bd.r !== r ? {} : S.bd && S.bd.defOv, defHist: S.bd && S.bd.r !== r ? [] : S.bd && S.bd.defHist }; render(); return; }
   if (t.dataset.act === 'bd-lib-save' && L) { S.bdHist = {}; const N = withLibMode(L, S.bd.lib); L.rotations = N.rotations; L.liberos = N.liberos; saveLineup(L); toast(S.bd.lib === 'none' ? 'Saved: no libero' : `Saved: libero for ${S.bd.lib === 'oh' ? 'OH' : 'MB'} in every rotation`); render(); return; }
@@ -1944,13 +1836,9 @@ document.addEventListener('click', e => {
   if (a === 'del') { S.confirmDel = true; render(); return; }
   if (a === 'del-no') { S.confirmDel = false; render(); return; }
   if (a === 'del-yes' && L) { S.confirmDel = false; deleteLineup(L); return; }
-  if (a === 'review') { reviewLineup(); return; }
-  if (a === 'review-close') { S.review = null; render(); return; }
   if (a === 'suggest') { const r = S.ed.r; const rec = ENG.recommend(L, r, S.team, rotOf(L, r)); S.sug = { lu: L.id, r, ...rec }; render(); return; }
   if (a === 'apply-sug') { const rot = rotOf(L, S.ed.r); rot.calls = { ...S.sug.calls }; S.sug = null; saveLineup(L, [S.ed.r]); render(); return; }
   if (a === 'dismiss-sug') { S.sug = null; render(); return; }
-  if (a === 'ask') { askClaude(); return; }
-  if (a === 'apply-ai' || a === 'apply-ai-alt') { const rot = rotOf(L, S.ed.r); rot.calls = { ...(a === 'apply-ai' ? S.ai.data.calls : S.ai.data.alternative.calls) }; saveLineup(L, [S.ed.r]); toast('Calls updated'); render(); return; }
   if (a === 'ed-view') { S.ed.view = t.dataset.v; if (S.ed.view === 'anim') Object.assign(anims.top, { fresh: true, playing: false }); render(); return; }
   if (a === 'pass-tog' || a === 'pass-pre' || a === 'sr-hide') {
     const r = S.ed.r, rot = rotOf(L, r), c = ENG.court(L, r);
@@ -2074,7 +1962,7 @@ document.addEventListener('change', e => {
     // replay the play from the start with the ball going to the player whose set just changed
     Object.assign(anims.top, { t: 0, playing: true, cycle: false, featId: t.value ? t.dataset.call : null, fresh: false, changed: t.dataset.call }); if (S.ed.view === 'edit') S.ed.view = 'anim';
     S.ed.opt = 'cur'; S.ed.changedMsg = t.value ? `${nm(t.dataset.call)} now runs ${t.value}. Watch it at the top.` : `${nm(t.dataset.call)} has no call now.`;
-    dlog('callChange', { r: S.ed.r, id: t.dataset.call, code: t.value }); render(); return; }
+    render(); return; }
   if (t.id === 'libId' || t.id === 'libFor') {
     const r = S.ed.r, rot = rotOf(L, r), id = $('#libId').value;
     if (!id) rot.libero = null;
@@ -2174,7 +2062,6 @@ document.addEventListener('pointerup', () => {
   else d.g.classList.remove('dragging');
 });
 
-function fbView() { return ''; }
 
 /* ---------- teams, roster import, backups ---------- */
 const PASTE_EXAMPLE = '12, Jane Smith, S\n7, Maya Lopez, M, lefty\nAva Chen, L\n3 Riley Park OH/OPP back row passer';
@@ -2258,8 +2145,8 @@ function parseRoster(text) {
   });
   return { players: out, skipped };
 }
-function teamFrom({ name, season, players, source, clubKey, glossary }) {
-  return { id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, season: season || '', source: source || 'custom', clubKey: clubKey || null,
+function teamFrom({ name, season, players, source, glossary }) {
+  return { id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, season: season || '', source: source || 'custom',
     players, glossary: clone(glossary || GLOSSARY), subLimit: 15, createdAt: new Date().toISOString() };
 }
 function openTeam(id, quiet) {
@@ -2310,7 +2197,6 @@ function toRosterV7(t) {
   t.sixMap = clone(SIX_MAP); t.liveName = t.liveName || ''; t.sampleV = 7;
 }
 const SAMPLE_IDS = { 1: 'SS', 2: 'OH', 3: 'MB', 4: 'RS', 5: 'OH2', 6: 'MB2', 7: 'LL', 8: 'DS', 9: 'OH3', 10: 'MB3', 11: 'S2', 12: 'S3' };
-const SAMPLE_NAMES = {};
 const SAMPLE_LINEUP = {"name":"Starting six","system":"5-1","order":["SS","OH","MB","RS","OH2","MB2"],"setters":["SS"],"swaps":[],"subs":[],"liberos":["LL"],"rotations":[{"r":1,"spots":{"SS":[0.913,0.69],"OH":[0.833,0.57],"MB":[0.267,0.358],"RS":[0.029,0.388],"OH2":[0.167,0.66],"LL":[0.5,0.68]},"calls":{"OH":"5","MB":"1","RS":"4"},"libero":{"id":"LL","replaces":"MB2"},"note":"","passers":["LL","OH2","OH"],"lines":{"OH":{"to":[0.95,0.05],"off":[0.211,0.056]},"MB":{"to":[0.548,0.057],"off":[0.032,0.261]},"RS":{"to":[0.04,0.05],"off":[-0.063,0.049]}}},{"r":2,"spots":{"OH":[0.833,0.66],"MB":[0.956,0.345],"RS":[0.832,0.095],"OH2":[0.167,0.57],"LL":[0.5,0.68],"SS":[0.711,0.229]},"calls":{"MB":"1","RS":"5","OH2":"4"},"libero":{"id":"LL","replaces":"MB2"},"note":"","passers":["LL","OH","OH2"],"lines":{"MB":{"to":[0.64,0.05],"off":[-0.41,0.304]},"RS":{"to":[0.95,0.05],"off":[0.229,0.416]},"OH2":{"to":[0.04,0.05],"off":[-0.287,0.032]}}},{"r":3,"spots":{"LL":[0.839,0.76],"RS":[0.956,0.306],"OH2":[0.203,0.698],"MB2":[0.098,0.115],"SS":[0.283,0.234],"OH":[0.559,0.772]},"calls":{"RS":"5","OH2":"4","MB2":"1"},"libero":{"id":"LL","replaces":"MB"},"note":"","passers":["LL","OH","OH2"],"lines":{"RS":{"to":[0.95,0.05],"off":[0,-0.02]},"OH2":{"to":[0.04,0.05],"off":[-0.221,0.14]},"MB2":{"to":[0.508,0.078],"off":[0.045,0.589]}}},{"r":4,"spots":{"RS":[0.93,0.874],"OH2":[0.24,0.632],"MB2":[0.165,0.275],"SS":[0.081,0.088],"OH":[0.529,0.715],"LL":[0.809,0.686]},"calls":{"OH2":"4","MB2":"1"},"libero":{"id":"LL","replaces":"MB"},"note":"","passers":["LL","OH","OH2"],"lines":{"OH2":{"to":[0.024,0.047],"off":[-0.275,0.097]},"MB2":{"to":[0.523,0.087],"off":[0.099,0.435]}}},{"r":5,"spots":{"OH2":[0.833,0.66],"MB2":[0.949,0.356],"SS":[0.59,0.08],"OH":[0.167,0.57],"LL":[0.5,0.68],"RS":[0.6,0.86]},"calls":{"MB2":"1","OH":"4"},"libero":{"id":"LL","replaces":"MB"},"note":"","passers":["LL","OH2","OH"],"lines":{"MB2":{"to":[0.684,0.081],"off":[0.154,-0.015]},"OH":{"to":[0.04,0.05],"off":[-0.149,0.077]}}},{"r":6,"spots":{"LL":[0.813,0.682],"SS":[0.676,0.088],"OH":[0.237,0.622],"MB":[0.15,0.101],"RS":[0.067,0.86],"OH2":[0.52,0.722]},"calls":{"OH":"4","MB":"1"},"libero":{"id":"LL","replaces":"MB2"},"note":"","passers":["LL","OH2","OH"],"lines":{"OH":{"to":[0.04,0.05],"off":[-0.274,0.069]},"MB":{"to":[0.6,0.05],"off":[0.013,0.475]}}}]};
 const SAMPLE_LINEUP_62 = {"name":"Starting six","system":"6-2","order":["SS","OH","MB","RS","OH2","MB2"],"setters":["SS","S2"],"swaps":[],"subs":[{"in":"S2","out":"RS","rs":[4,5,6]}],"liberos":["LL"],"rotations":[{"r":1,"spots":{"SS":[0.913,0.69],"OH":[0.833,0.57],"MB":[0.267,0.358],"RS":[0.029,0.388],"OH2":[0.167,0.66],"LL":[0.5,0.68]},"calls":{"OH":"5","MB":"1","RS":"4"},"libero":{"id":"LL","replaces":"MB2"},"note":"","passers":["LL","OH2","OH"],"lines":{"OH":{"to":[0.95,0.05],"off":[0.211,0.056]},"MB":{"to":[0.548,0.057],"off":[0.032,0.261]},"RS":{"to":[0.04,0.05],"off":[-0.063,0.049]}}},{"r":2,"spots":{"OH":[0.833,0.66],"MB":[0.956,0.345],"RS":[0.832,0.095],"OH2":[0.167,0.57],"LL":[0.5,0.68],"SS":[0.711,0.229]},"calls":{"MB":"1","RS":"5","OH2":"4"},"libero":{"id":"LL","replaces":"MB2"},"note":"","passers":["LL","OH","OH2"],"lines":{"MB":{"to":[0.64,0.05],"off":[-0.41,0.304]},"RS":{"to":[0.95,0.05],"off":[0.229,0.416]},"OH2":{"to":[0.04,0.05],"off":[-0.287,0.032]}}},{"r":3,"spots":{"LL":[0.839,0.76],"RS":[0.956,0.306],"OH2":[0.203,0.698],"MB2":[0.098,0.115],"SS":[0.283,0.234],"OH":[0.559,0.772]},"calls":{"RS":"5","OH2":"4","MB2":"1"},"libero":{"id":"LL","replaces":"MB"},"note":"","passers":["LL","OH","OH2"],"lines":{"RS":{"to":[0.95,0.05],"off":[0,-0.02]},"OH2":{"to":[0.04,0.05],"off":[-0.221,0.14]},"MB2":{"to":[0.508,0.078],"off":[0.045,0.589]}}},{"r":4,"spots":{"S2":[0.913,0.69],"OH2":[0.833,0.57],"MB2":[0.267,0.358],"SS":[0.029,0.388],"OH":[0.167,0.66],"LL":[0.5,0.68]},"calls":{"OH2":"5","MB2":"1","SS":"4"},"libero":{"id":"LL","replaces":"MB"},"note":"","passers":["LL","OH","OH2"],"lines":{"OH2":{"to":[0.95,0.05],"off":[0.211,0.056]},"MB2":{"to":[0.548,0.057],"off":[0.032,0.261]},"SS":{"to":[0.04,0.05],"off":[-0.063,0.049]}}},{"r":5,"spots":{"OH2":[0.833,0.66],"MB2":[0.956,0.345],"SS":[0.832,0.095],"OH":[0.167,0.57],"LL":[0.5,0.68],"S2":[0.711,0.229]},"calls":{"MB2":"1","SS":"5","OH":"4"},"libero":{"id":"LL","replaces":"MB"},"note":"","passers":["LL","OH2","OH"],"lines":{"MB2":{"to":[0.64,0.05],"off":[-0.41,0.304]},"SS":{"to":[0.95,0.05],"off":[0.229,0.416]},"OH":{"to":[0.04,0.05],"off":[-0.287,0.032]}}},{"r":6,"spots":{"LL":[0.839,0.76],"SS":[0.956,0.306],"OH":[0.203,0.698],"MB":[0.098,0.115],"S2":[0.283,0.234],"OH2":[0.559,0.772]},"calls":{"SS":"5","OH":"4","MB":"1"},"libero":{"id":"LL","replaces":"MB2"},"note":"","passers":["LL","OH2","OH"],"lines":{"SS":{"to":[0.95,0.05],"off":[0,-0.02]},"OH":{"to":[0.04,0.05],"off":[-0.221,0.14]},"MB":{"to":[0.508,0.078],"off":[0.045,0.589]}}}]};
 function buildSample62() { const L = clone(SAMPLE_LINEUP_62); L.id = 'l' + Date.now().toString(36) + 'b'; L.source = 'Sample lineup'; L.sort = Date.now() + 1; return L; }
@@ -2346,27 +2232,11 @@ function applySampleTemplate(L, r, R) {
   R.spots = spots; R.calls = calls; if (passers.length >= 2) R.passers = passers;
 }
 
-function sampleToV5(t) {
-  const ren = { RS2: 'S2', OH4: 'S3' };
-  t.players.forEach(p => { if (ren[p.id]) p.id = ren[p.id]; if (SAMPLE_NAMES[p.id]) { p.first = SAMPLE_NAMES[p.id]; p.last = ''; }
-    if (p.id === 'S2' || p.id === 'S3') { p.roles = ['S']; p.backRow = false; p.passer = false; } p.hand = 'R'; });
-  if (t.name === 'Sample Team') t.name = 'Team';
-  (DB.lineups[t.id] || []).forEach(L => {
-    if (L.system !== '6-2' || !(L.setters || []).includes('RS') || !t.players.some(p => p.id === 'S2')) return;
-    L.setters = L.setters.map(x => x === 'RS' ? 'S2' : x);
-    L.subs = (L.subs || []).concat([{ in: 'S2', out: 'RS', rs: [4, 5, 6] }]);
-    L.rotations.forEach(R => { if (!R || R.r < 4) return;
-      ['spots', 'calls'].forEach(k => { if (R[k] && R[k].RS !== undefined) { R[k].S2 = R[k].RS; delete R[k].RS; } });
-      if (R.lines && R.lines.RS) { R.lines.S2 = R.lines.RS; delete R.lines.RS; }
-      R.passers = (R.passers || []).map(x => x === 'RS' ? 'S2' : x); });
-  });
-  t.sampleV = 5;
-}
 function seedSample() {
   try {
     const { players } = parseRoster(SAMPLE_ROSTER);
     const roles = { SS: ['S'], OH: ['OH'], MB: ['M'], RS: ['OPP'], OH2: ['OH'], MB2: ['M'], LL: ['L'], DS: ['DS'], OH3: ['OH'], MB3: ['M'], S2: ['S'], S3: ['S'] };
-    players.forEach(p => { p.id = SAMPLE_IDS[p.jersey] || p.id; p.first = SAMPLE_NAMES[p.id] || p.first; p.last = ''; if (roles[p.id]) p.roles = roles[p.id]; });
+    players.forEach(p => { p.id = SAMPLE_IDS[p.jersey] || p.id; p.last = ''; if (roles[p.id]) p.roles = roles[p.id]; });
     const t = teamFrom({ name: 'Sample Team', season: SEASON_DEFAULT, source: 'sample', players }); t.sampleV = 6;
     relInit(t); subInit(t);
     t.setterX = 0.71; t.glossary.forEach(g => { if (g.rel && typeof g.off === 'number') g.x = +(0.71 + g.off).toFixed(2); });
