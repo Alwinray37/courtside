@@ -12,14 +12,14 @@ function rotView() {
     const sz = c.setter ? c.zoneOf[c.setter] : null;
     const lib = c.libero ? ` · ${nm(c.libero.id)} in for ${nm(c.libero.replaces)}` : '';
     return `<div class="rot" role="button" tabindex="0" data-open="${r}" data-comment-target data-rot-card="${r}" aria-label="Open rotation ${r}">
-      <div class="rothead"><div class="num">${r}</div><div class="meta"><b>${c.setter ? `${esc(nm(c.setter))} sets · zone ${sz}` : 'No setter on court'}${r === 1 ? ' · start' : ''}</b><span>${isF(sz) ? 'Setter front row' : 'Setter back row'}${esc(lib)}</span></div>${st.cls === 'ok' ? '' : `<span class="pill ${st.cls}">${st.t}</span>`}${(e || w) && S.canWrite ? `<button class="btn fixbtn" data-act="autofix" data-r="${r}">Fix it</button>` : ''}</div>
+      <div class="rothead"><div class="num">${r}</div><div class="meta"><b>${c.setter ? `${esc(nm(c.setter))} sets · zone ${sz}` : 'No setter on court'}${r === 1 ? ' · start' : ''}</b><span>${isF(sz) ? 'Setter front row' : 'Setter back row'}${esc(lib)}</span></div>${st.cls === 'ok' ? '' : `<span class="pill ${st.cls}">${st.t}</span>`}${e || w ? `<button class="btn fixbtn" data-act="autofix" data-r="${r}">Fix it</button>` : ''}</div>
       ${courtSVG(L, r, { issues: iss, ghosts: ghostsFor(L, r) })}
       ${frontRowList(L, r, rot.calls, iss)}
       ${rot.note ? `<div class="note">${esc(rot.note)}</div>` : ''}
     </div>`;
   }).join('');
   const sum = errs || warns
-    ? `${S.canWrite ? `<button class="btn primary" data-act="autofix-all">Fix all</button>` : ''}<span class="pill ${errs ? 'err' : 'warn'}">${errs ? `${errs} rule problem${errs > 1 ? 's' : ''}` : ''}${errs && warns ? ' · ' : ''}${warns ? `${warns} to check` : ''}</span>${chips.join('')}`
+    ? `<button class="btn primary" data-act="autofix-all">Fix all</button><span class="pill ${errs ? 'err' : 'warn'}">${errs ? `${errs} rule problem${errs > 1 ? 's' : ''}` : ''}${errs && warns ? ' · ' : ''}${warns ? `${warns} to check` : ''}</span>${chips.join('')}`
     : '';
   return `${sum ? `<div class="summary">${sum}</div>` : ''}${fixPanel(L)}<div class="board">${cards}</div>
   <div class="legend" style="margin-top:22px">${legend()}</div>`;

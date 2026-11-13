@@ -5,7 +5,9 @@
 1. `npm run dev` and open http://localhost:5173/courtside/
 2. Edit `src/`. The page hot-reloads.
 3. If you touched `engine.js`, add or update a test in `tests/engine.test.js` and run `npm test`.
-4. Before pushing, run `npm test && npm run build && npm run test:e2e`.
+4. Before pushing, run `npm test && npm run test:e2e`. The e2e run builds the app and tests the production build through `vite preview` on port 4173.
+   - The first time, install the test browser with `npx playwright install chromium`.
+   - To use your installed Google Chrome instead, run `PW_CHANNEL=chrome npm run test:e2e`.
 
 Note that `localhost` and the live site have **separate storage**. Your real team on the live site isn't visible locally. To test with it, download a backup on the live site and restore it locally (see [DATA.md](DATA.md)).
 

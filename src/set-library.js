@@ -81,8 +81,8 @@ function callsTable() {
     <td><input type="checkbox" data-gf="confirmed" ${g.confirmed ? 'checked' : ''} aria-label="Confirmed"></td>
     <td>${used.has(g.code) ? '<span class="small">In use</span>' : `<button class="btn ghost danger" data-act="del-call" data-gi="${i}">Remove</button>`}</td></tr>`).join('')}
   </tbody></table></div>
-  ${S.canWrite ? `<div class="btnrow" style="margin-top:12px;align-items:center"><input type="text" id="newCall" placeholder="New call, e.g. Pipe" style="max-width:200px"><button class="btn primary" data-act="add-call">Add call</button>
-  <span style="margin-left:auto" class="lbl2">Subs allowed per set <input type="number" min="6" max="18" id="subLimit" value="${S.team.subLimit || 15}" style="width:80px"></span></div>` : ''}</div>`;
+  <div class="btnrow" style="margin-top:12px;align-items:center"><input type="text" id="newCall" placeholder="New call, e.g. Pipe" style="max-width:200px"><button class="btn primary" data-act="add-call">Add call</button>
+  <span style="margin-left:auto" class="lbl2">Subs allowed per set <input type="number" min="6" max="18" id="subLimit" value="${S.team.subLimit || 15}" style="width:80px"></span></div></div>`;
 }
 /* front-row sets that key off the setter (quicks, the 2, Back 1, Back Gap, Slide) move with the setter target.
    Pin sets stay at the antennas, and back-row sets (30, 40, Bic, Pipe, A, D) stay put: they're aimed at seams in their block, not at the setter */

@@ -1,5 +1,5 @@
 export function createLiveSet(ctx) {
-  const { P, S, boardSnap, clone, courtSVG, curL, ensureSpots, esc, frontRowList, full, isF, jer, lblBase, nm, pool, render, roleCls, roleOf, saveLineup, saveTeam, shortName, titleOf, toast, tokP, ENG, RT } = ctx;
+  const { P, S, clone, courtSVG, curL, ensureSpots, esc, frontRowList, full, isF, jer, lblBase, nm, pool, render, roleCls, roleOf, saveLineup, saveTeam, shortName, titleOf, toast, tokP, ENG, RT } = ctx;
 /* ---------- live set ----------
    The set is tracked by serving-order spot ("slot" 0-5, the lineup's order). Each slot keeps its position (S1, OH1, MB1...),
    so whoever stands in a slot plays that position: spots, calls and lines follow the slot, not the player.
@@ -276,11 +276,7 @@ document.addEventListener('change', e => {
   const U = S.liveSetup;
   if (e.target.id === 'liveR' && U) { U.r = +e.target.value; render(); }
   if (e.target.id === 'liveLib' && U) { U.lib = e.target.value || null; render(); }
-  if (e.target.id === 'liveThem' && U) { U.them = e.target.value.trim() || 'Them'; }
   if (e.target.id && e.target.id.startsWith('liveName-')) liveRenameSave(e.target);
-});
-document.addEventListener('change', e => {
-  if (e.target.name === 'bdlib' && S.bd) { const prev = boardSnap(); S.bd.lib = e.target.value; S.bd.anim = 'rot'; S.bd.prev = prev; render(); }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id && e.target.id.startsWith('liveName-')) { e.preventDefault(); e.target.blur(); } });
 document.addEventListener('input', e => { if (e.target.id === 'liveThem' && S.liveSetup) S.liveSetup.them = e.target.value.trim() || 'Them'; });

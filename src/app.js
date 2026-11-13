@@ -18,7 +18,7 @@ const SYS = {
   '4-2': { label: '4-2', d: 'Two setters opposite; front-row one sets.' }
 };
 const S = { team: null, lineups: [], cur: null, view: 'board', bd: { r: 1 }, ed: null, sug: null, dlg: null,
-  confirmDel: false, fixLog: null, canWrite: true, live: null };
+  confirmDel: false, fixLog: null, live: null };
 let dragging = null;
 
 const $ = s => document.querySelector(s);
@@ -62,11 +62,17 @@ const full = id => `${P(id).first || id} ${P(id).last || ''}`.trim();
 const G = code => S.team.glossary.find(g => g.code === code);
 const curL = () => S.lineups.find(l => l.id === S.cur);
 const isF = ENG.isFront;
+async function copyText(text, msg) {      // clipboard API, else select the backup box and use the old copy command
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; }
+  catch (e) { const el = document.getElementById('bkText'); if (el) { el.select(); try { ok = document.execCommand('copy'); } catch (e2) {} } }
+  toast(ok ? msg : 'Couldn’t copy. Select the text and copy it yourself.');
+}
 const toast = msg => { document.querySelectorAll('.toast').forEach(x => x.remove()); const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 2600); };
 const titleOf = L => `${L.system} – ${L.name}`;
 const shortName = () => { const n = (S.team && S.team.name) || 'Us'; const w = n.replace(/^\d+(\/\d+)?\s*/, ''); return (w || n).slice(0, 14); };
 
-let DB = { v: 1, teams: {}, lineups: {}, cur: null };
+const DB = { v: 1, teams: {}, lineups: {}, cur: null };   // const: storage.js holds this same object, so never reassign it
 function deleteLineup(L) {
   S.lineups = S.lineups.filter(x => x.id !== L.id);
   S.cur = S.lineups[0] ? S.lineups[0].id : null;
@@ -600,7 +606,7 @@ function designer(L, r) {
       <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><span class="bignum mono">${o.score}</span>${(o.plays || []).map(p => `<span class="pill neutral">${esc(p)}</span>`).join('')}</div>
       <p class="small" style="margin:6px 0 4px"><b>Passers:</b> ${ENG.passersOf(L, r, S.team, rotOf(L, r)).map(nm).join(', ')}${o.spots ? ' · <b>lined up for these sets</b>: yellow dashed rings are passers’ start spots' : ''}</p>
       <p class="small" style="margin:0 0 10px">${read.quickId ? `Their middle has to jump with <b>${esc(nm(read.quickId))}</b>’s quick, which frees the others.${read.slideId ? ` Their outside blocker follows <b>${esc(nm(read.slideId))}</b>’s slide.` : ''}` : read.slideId ? `Their outside blocker follows <b>${esc(nm(read.slideId))}</b>’s slide and their middle stays just inside her, which pulls the block right and thins out our left side.` : '<b>Nothing holds their middle blocker</b>, so she can help on every set.'} ${read.attackers} attackers against 3 blockers.${o.crossings ? ` ${o.crossings} route${o.crossings > 1 ? 's' : ''} cross.` : ''}</p>
-      ${sel.k !== 'cur' && S.canWrite ? (same ? '<p class="small" style="margin:0 0 10px">This is already rotation ' + r + '’s combo.</p>' : `<div class="btnrow" style="margin:0 0 12px"><button class="btn primary" data-act="use-opt" data-k="${sel.k}">Set ${sel.label} as rotation ${r}</button></div>`) : ''}
+      ${sel.k !== 'cur' ? (same ? '<p class="small" style="margin:0 0 10px">This is already rotation ' + r + '’s combo.</p>' : `<div class="btnrow" style="margin:0 0 12px"><button class="btn primary" data-act="use-opt" data-k="${sel.k}">Set ${sel.label} as rotation ${r}</button></div>`) : ''}
       <ul class="hitlist">${rows.map(x => `<li><span class="chipi">${esc(lbl(x.id))}</span><div><div><b>${esc(nm(x.id))}</b> <span class="what">${esc(x.code)}</span> <span class="tag ${x.g.row}">${x.g.row === 'F' ? 'FRONT' : 'BACK'}</span> <span class="tag" style="color:${tempoColor(x.g.tempo)}">${TEMPO[x.g.tempo].toUpperCase()}</span>${x.pr ? ` <span class="pill ${blockCls(x.pr.label)}" style="padding:1px 8px;font-size:12px">${esc(x.pr.label)}</span>` : ''}</div>
         <div class="small"><b>${(() => { const sp = (o.spots || rotOf(L, r).spots)[x.id]; return sp ? ENG.routeM(sp, x.g).toFixed(1) + ' m route' : ''; })()}</b>${ENG.passersOf(L, r, S.team, rotOf(L, r)).includes(x.id) ? ' · passing first' : ''} · ${esc(x.pr ? x.pr.why : '')}${x.f && x.f.why.length ? ` · ${esc(x.f.why.join(', '))}` : ''}</div>${x.f && x.f.warn.length ? `<div class="small" style="color:var(--warn)">${esc(x.f.warn.join('. '))}</div>` : ''}</div></li>`).join('')}</ul>
 
@@ -691,24 +697,23 @@ function editor() {
   const backIds = [5, 6, 1].map(z => base.zones[z]).filter(id => id !== base.setter);
   const libs = S.team.players.filter(p => p.roles.includes('L'));
   const isu = iss.length ? iss.map(i => `<li class="${i.level}"><span class="ic">${i.level === 'error' ? '!' : i.level === 'warn' ? '?' : 'i'}</span><span>${esc(i.msg)}</span></li>`).join('') : `<li class="ok"><span class="ic">✓</span><span>Legal formation, and every attacker has a legal call.</span></li>`;
-  const ro = !S.canWrite ? 'disabled' : '';
   return `<div class="sheet" data-act="close-bg"><div class="panel" role="dialog" aria-modal="true" aria-label="Rotation ${r} editor">
     <div class="phead"><div class="num" style="width:44px;height:44px;font-size:26px">${r}</div><div><h2>Rotation ${r}</h2><div class="small">${esc(titleOf(L))} · ${c.setter ? `${esc(nm(c.setter))} sets from zone ${c.zoneOf[c.setter]}` : 'no setter on court'}</div></div>
     <span class="grow"></span><div class="stepper" aria-label="Rotations">${[1, 2, 3, 4, 5, 6].map(k => `<button data-go="${k}" aria-current="${k === r}">${k}</button>`).join('')}</div><button class="btn" data-act="close">Done</button></div>
     ${S.ed.applied ? `<div class="alert ok" style="margin-bottom:12px"><span>${S.ed.applied.label === 'New lineup' ? 'Players are lined up for these sets.' : S.ed.applied.label === 'Receive' ? 'Serve receive changed and the formation re-lined up.' : S.ed.applied.label === 'Sub' ? 'Sub made for this rotation.' : `${esc(S.ed.applied.label)} is now rotation ${r}’s calls and serve-receive lineup.`}</span><span class="btnrow"><button class="btn" data-act="opt-undo">Undo</button><button class="btn ghost" data-act="opt-dismiss">OK</button></span></div>` : ''}
     <div class="edgrid"><div>
       <div class="viewtog" role="tablist"><button role="tab" aria-selected="${S.ed.view !== 'edit'}" data-act="ed-view" data-v="anim">Watch the play</button><button role="tab" aria-selected="${S.ed.view === 'edit'}" data-act="ed-view" data-v="edit">Edit spots</button></div>
-      ${S.ed.view === 'edit' ? `<div class="bigcourt">${courtSVG(L, r, { big: true, drag: S.canWrite, issues: iss, ghosts: ghostsFor(L, r) })}</div>
-      <p class="hint">${S.canWrite ? 'Drag players to their serve-receive spots. A red ring means an overlap problem; yellow means it’s too close to call.' : 'View only.'}</p>
+      ${S.ed.view === 'edit' ? `<div class="bigcourt">${courtSVG(L, r, { big: true, drag: true, issues: iss, ghosts: ghostsFor(L, r) })}</div>
+      <p class="hint">Drag players to their serve-receive spots. A red ring means an overlap problem; yellow means it’s too close to call.</p>
       <div class="legend">${legend()}</div>` : (() => { const A = anims.top, an = analysis(L, r); A.model = buildModel(L, r, an.calls, an.cur); return `<div class="dsvg">${animSVG(A.model, A)}${timeline(A.model, A)}${comboLegend()}</div>${S.ed.changedMsg ? `<div class="alert ok" style="margin-top:8px"><span>${esc(S.ed.changedMsg)} Combo now scores <b>${an.cur.score}</b>.</span></div>` : ''}<p class="hint">This rotation’s current combo (scores ${an.cur.score}). Change any player’s set on the right and it replays here. Switch to Edit spots to move players. Setter target: ${esc(sxLabel(SXT()))} (change it in Set library).</p>`; })()}
-      <div class="sec" style="margin-top:14px"><h3>Coach’s note</h3><textarea id="rotNote" placeholder="e.g. Hitters stay to block after they hit" ${ro}>${esc(rot.note || '')}</textarea></div>
+      <div class="sec" style="margin-top:14px"><h3>Coach’s note</h3><textarea id="rotNote" placeholder="e.g. Hitters stay to block after they hit">${esc(rot.note || '')}</textarea></div>
     </div>
     <div>
       <div class="sec"><h3>Who’s where and their call</h3><div class="zrows">${zr}</div>
         ${stray.length ? `<p class="err-text" style="margin:8px 0 0">${stray.map(id => `${esc(nm(id))} – ${esc(rot.calls[id])}`).join(', ')} ${stray.length > 1 ? 'are' : 'is'} listed but not on the court. <button class="btn ghost" data-act="clear-stray">Remove</button></p>` : ''}</div>
-      <div class="sec"><h3>Libero</h3><div class="row2"><select id="libId" ${ro}><option value="">No libero</option>${libs.map(p => `<option value="${esc(p.id)}" ${rot.libero && rot.libero.id === p.id ? 'selected' : ''}>${esc(full(p.id))}</option>`).join('')}</select>
-        <select id="libFor" ${ro} ${rot.libero ? '' : 'disabled'}>${backIds.map(id => `<option value="${esc(id)}" ${rot.libero && rot.libero.replaces === id ? 'selected' : ''}>in for ${esc(nm(id))}</option>`).join('')}</select></div>
-        <label class="lbl2" style="margin-top:8px">Coverage after the pass<select id="coverMode" ${ro}>
+      <div class="sec"><h3>Libero</h3><div class="row2"><select id="libId"><option value="">No libero</option>${libs.map(p => `<option value="${esc(p.id)}" ${rot.libero && rot.libero.id === p.id ? 'selected' : ''}>${esc(full(p.id))}</option>`).join('')}</select>
+        <select id="libFor" ${rot.libero ? '' : 'disabled'}>${backIds.map(id => `<option value="${esc(id)}" ${rot.libero && rot.libero.replaces === id ? 'selected' : ''}>in for ${esc(nm(id))}</option>`).join('')}</select></div>
+        <label class="lbl2" style="margin-top:8px">Coverage after the pass<select id="coverMode">
           <option value="set" ${S.team.coverMode !== 'quick' ? 'selected' : ''}>Libero and DS cover whoever gets the set</option>
           <option value="quick" ${S.team.coverMode === 'quick' ? 'selected' : ''}>Libero follows the quick hitter (1, Back 1, 31); DS covers the set</option></select></label>
         <p class="small" style="margin:4px 0 0">Applies to every rotation of this team. Lanes are the dashed lines in the play (red for the libero), and they never cross a back-row hitter’s route or the lane in front of her.</p>
@@ -719,18 +724,18 @@ function editor() {
           const cand = Object.values(c.zones).filter(id => id !== c.setter && id !== o.showGo && !o.hide.includes(id));
           const fronts = [4, 3, 2].map(z => c.zones[z]).filter(id => id !== c.setter && !(c.libero && c.libero.id === id));
           const backs = [5, 6, 1].map(z => c.zones[z]).filter(id => id !== c.setter);
-          const pre = (n, label) => `<button class="btn ghost" data-act="pass-pre" data-n="${n}" ${ro}>${label}</button>`;
+          const pre = (n, label) => `<button class="btn ghost" data-act="pass-pre" data-n="${n}">${label}</button>`;
           return `<p class="small" style="margin:-2px 0 8px">Tap players to pass. The formation re-lines up on its own, legal and spread out.</p>
-          <div class="lbl2">Passers (${ps.length})<div class="roles" style="margin-top:4px">${cand.map(id => `<button class="rchip" aria-pressed="${ps.includes(id)}" data-act="pass-tog" data-id="${esc(id)}" ${ro}>${esc(nm(id))}${c.libero && c.libero.id === id ? ' (L)' : ''}</button>`).join('')}</div></div>
+          <div class="lbl2">Passers (${ps.length})<div class="roles" style="margin-top:4px">${cand.map(id => `<button class="rchip" aria-pressed="${ps.includes(id)}" data-act="pass-tog" data-id="${esc(id)}">${esc(nm(id))}${c.libero && c.libero.id === id ? ' (L)' : ''}</button>`).join('')}</div></div>
           <div class="btnrow" style="margin-top:8px"><span class="small" style="align-self:center">Presets:</span>${pre(2, '2 passers')}${pre(3, 'Best 3')}${pre(4, '4 passers')}${pre('lib2', 'Libero + 2 outsides')}</div>
-          <div class="row2" style="margin-top:10px"><label class="lbl2">Show &amp; go<select id="srShow" ${ro}><option value="">None</option>${fronts.map(id => `<option value="${esc(id)}" ${o.showGo === id ? 'selected' : ''}>${esc(nm(id))} (${esc(P(id).roles.join('/') || 'front row')})</option>`).join('')}</select></label>
-          <div class="lbl2">Hide from passing<div class="roles" style="margin-top:4px">${backs.length ? backs.map(id => `<button class="rchip" aria-pressed="${o.hide.includes(id)}" data-act="sr-hide" data-id="${esc(id)}" ${ro}>${esc(nm(id))}</button>`).join('') : '<span class="small">No back-row players to hide</span>'}</div></div></div>
+          <div class="row2" style="margin-top:10px"><label class="lbl2">Show &amp; go<select id="srShow"><option value="">None</option>${fronts.map(id => `<option value="${esc(id)}" ${o.showGo === id ? 'selected' : ''}>${esc(nm(id))} (${esc(P(id).roles.join('/') || 'front row')})</option>`).join('')}</select></label>
+          <div class="lbl2">Hide from passing<div class="roles" style="margin-top:4px">${backs.length ? backs.map(id => `<button class="rchip" aria-pressed="${o.hide.includes(id)}" data-act="sr-hide" data-id="${esc(id)}">${esc(nm(id))}</button>`).join('') : '<span class="small">No back-row players to hide</span>'}</div></div></div>
           <p class="small" style="margin:6px 0 0">Show &amp; go: she lines up like a passer, then leaves for her approach on the serve. Hide: a back-row player tucks into the deep corner and stays out of the passing line.</p>`;
         })()}
       </div>
       <div class="sec"><h3>Rule check</h3><ul class="issues">${isu}</ul></div>
       <div class="sec"><h3>Tools</h3>
-        <div class="btnrow">${S.canWrite ? `${iss.some(i => i.level !== 'info') ? `<button class="btn primary" data-act="autofix" data-r="${r}">Fix this rotation</button>` : ''}<button class="btn primary" data-act="lineup">Line up for these sets</button><button class="btn" data-act="rebuild">Rebuild formation</button>` : ''}</div>
+        <div class="btnrow">${iss.some(i => i.level !== 'info') ? `<button class="btn primary" data-act="autofix" data-r="${r}">Fix this rotation</button>` : ''}<button class="btn primary" data-act="lineup">Line up for these sets</button><button class="btn" data-act="rebuild">Rebuild formation</button></div>
         ${fixPanel(L, r)}</div>
     </div></div>${designer(L, r)}</div></div>`;
 }
@@ -1095,7 +1100,7 @@ function fixPanel(L, onlyR) {
   if (!items.length) return '';
   return `<div class="ai" style="background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 40%,var(--rule));${onlyR ? '' : 'margin:0 0 18px'}">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h4 style="flex:1;color:var(--ok)">✓ ${items.length === 1 ? `Rotation ${items[0].r} is fixed` : `${items.length} rotations fixed`}</h4>
-    ${S.canWrite ? `<button class="btn" data-act="fix-undo">Undo</button>` : ''}<button class="btn ghost" data-act="fix-close">Close</button></div>
+    <button class="btn" data-act="fix-undo">Undo</button><button class="btn ghost" data-act="fix-close">Close</button></div>
     <ul class="rules" style="margin-top:6px">${items.map(i => `<li><b>R${i.r}:</b> ${esc(i.changes.join('. '))}.${i.remaining.length ? ` <span class="err-text">Still needs you: ${esc(i.remaining.join(' '))}</span>` : ''}</li>`).join('')}</ul>
     <p class="small" style="margin:6px 0 0">Dashed circles show where players stood before. Calls that were still legal were kept.</p></div>`;
 }
@@ -1226,9 +1231,9 @@ document.addEventListener('click', e => {
   if (t.dataset.act === 'pv-r') { readDlg(); S.dlg.pvR = +t.dataset.r; render(); return; }
   if (t.dataset.act === 'dlg-manual') { readDlg(); S.dlg.manual = true; S.dlg.err = ''; render(); return; }
   if (t.dataset.act === 'dlg-positions') { readDlg(); const D = S.dlg; if (!posFromOrder(D)) { autoPos(D); toast('The setter wasn’t in the serving order, so positions were filled from player roles.'); } D.manual = false; D.err = ''; syncPos(D); render(); return; }
-  if (t.dataset.cant) { if (!S.canWrite) return; const p = P(t.closest('[data-pid]').dataset.pid), c = t.dataset.cant; p.cant = (p.cant || []).includes(c) ? p.cant.filter(x => x !== c) : (p.cant || []).concat(c); saveTeam(); render(); return; }
-  if (t.dataset.role) { if (!S.canWrite) return; const p = P(t.closest('[data-pid]').dataset.pid); const r = t.dataset.role; p.roles = p.roles.includes(r) ? p.roles.filter(x => x !== r) : p.roles.concat(r); saveTeam(); render(); return; }
-  if (t.dataset.grole) { if (!S.canWrite) return; const g = S.team.glossary[+t.closest('[data-gi]').dataset.gi]; const r = t.dataset.grole; g.roles = (g.roles || []).includes(r) ? g.roles.filter(x => x !== r) : (g.roles || []).concat(r); saveTeam(); render(); return; }
+  if (t.dataset.cant) { const p = P(t.closest('[data-pid]').dataset.pid), c = t.dataset.cant; p.cant = (p.cant || []).includes(c) ? p.cant.filter(x => x !== c) : (p.cant || []).concat(c); saveTeam(); render(); return; }
+  if (t.dataset.role) { const p = P(t.closest('[data-pid]').dataset.pid); const r = t.dataset.role; p.roles = p.roles.includes(r) ? p.roles.filter(x => x !== r) : p.roles.concat(r); saveTeam(); render(); return; }
+  if (t.dataset.grole) { const g = S.team.glossary[+t.closest('[data-gi]').dataset.gi]; const r = t.dataset.grole; g.roles = (g.roles || []).includes(r) ? g.roles.filter(x => x !== r) : (g.roles || []).concat(r); saveTeam(); render(); return; }
   const a = t.dataset.act;
   if (a === 'close-bg') { if (e.target === t) { S.ed = null; S.dlg = null; render(); } return; }
   if (a === 'close') { S.ed = null; S.sug = null; render(); return; }
@@ -1322,7 +1327,6 @@ document.addEventListener('click', e => {
     const sh = document.querySelector('.sheet'); if (sh) sh.scrollTo({ top: 0, behavior: 'smooth' });
     return;
   }
-  if (a === 'retry-save') { setSave('saving'); retrySaves(); return; }
   if (a === 'autofix') { fixRotations(L, [+t.dataset.r]); return; }
   if (a === 'autofix-all') { fixRotations(L, [1, 2, 3, 4, 5, 6].filter(r => issuesFor(L, r).some(i => i.level !== 'info'))); return; }
   if (a === 'fix-close') { S.fixLog = null; render(); return; }
@@ -1437,7 +1441,6 @@ function redrawLine(d, id) {
   if (mid) mid.setAttribute('transform', `translate(${g.M[0].toFixed(1)},${g.M[1].toFixed(1)})`);
 }
 document.addEventListener('pointerdown', e => {
-  if (!S.canWrite) return;
   const h = e.target.closest('.board-svg .lhg'), g = h ? null : e.target.closest('.drag .tok'); if (!h && !g) return;
   const svg = (h || g).ownerSVGElement, L = curL(), r = +svg.dataset.r, rot = rotOf(L, r);
   const snap = rotSnap(rot);
@@ -1731,10 +1734,6 @@ function backupData(ids) {
 async function saveBackup(ids, label) {
   const data = backupData(ids), file = `${label.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'lineups'}-${new Date().toISOString().slice(0, 10)}.json`;
   S.bk = { ...S.bk, msg: '', text: '' };
-  if (false) {
-    try { await S.downloads.save({ filename: file, data }); S.bk.msg = `Saved ${file}.`; S.bk.ok = true; render(); return; }
-    catch (e) { if (e && e.code === 'declined') { S.bk.msg = 'Download cancelled.'; S.bk.ok = false; render(); return; } }
-  }
   try {
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' })); a.download = file; document.body.appendChild(a); a.click(); a.remove();
     S.bk.msg = `If nothing downloaded, use the copy box below.`; S.bk.ok = true;
